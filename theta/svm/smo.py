@@ -28,12 +28,12 @@ def smo_simple(data_input, class_label, C, toler, maxIter):
 	while iteration < maxIter:
 		alpha_pair_change = 0
 		for i in xrange(m):
-			gx_i = alphas * class_label * data_input[i, :] * data_input + b
+			gx_i = ((alphas * class_label).reshape(m, ) * (data_input[i, :] * data_input).sum(axis=1)).sum() + b
 			E_i = gx_i - class_label[i]
 
 			if (class_label[i] * E_i < -toler and alphas[i] < C) or (class_label[i] * E_i > toler and alphas[i] > 0):
 				j = select_j_randomly(i, m)
-				gx_j = alphas * class_label * data_input[j, :] * data_input + b
+				gx_j = ((alphas * class_label).reshape(m, ) * (data_input[j, :] * data_input).sum(axis=1)).sum() + b
 				E_j = gx_j - class_label[j]
 				alpha_i_old = alphas[i].copy()
 				alpha_j_old = alphas[j].copy()
@@ -47,7 +47,7 @@ def smo_simple(data_input, class_label, C, toler, maxIter):
 				if L == H:
 					print 'L == H'
 					continue
-				eta = data_input[i, :] ** 2 + data_input[j, :] ** 2 - 2 * data_input[i, :] * data_input[j, :]
+				eta = (data_input[i, :] ** 2).sum() + (data_input[j, :] ** 2).sum() - 2 * (data_input[i, :] * data_input[j, :]).sum()
 				alphas[j] += class_label[j] * (E_i - E_j) / eta
 				clip_alpha(alphas[j], H, L)
 				if abs(alphas[j] - alpha_j_old) < 0.00001:
@@ -74,3 +74,8 @@ def smo_simple(data_input, class_label, C, toler, maxIter):
 			iteration = 0
 		print 'iteration number: %s' % iteration
 	return b, alphas
+
+if __name__ == '__main__':
+	data_path = '../data/testSet.txt'
+	data_arr, label_arr = load_dataset(data_path)
+	smo_simple(data_arr, label_arr, 0.6, 0.001, 40)
