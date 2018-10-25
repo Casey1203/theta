@@ -4,6 +4,7 @@
 
 import numpy as np
 from theta.util.file_loader import load_dataset
+from kernel import poly_kernel, rbf_kernel
 
 # 获得支撑向量
 def get_support_vector_index(alphas):
@@ -114,23 +115,36 @@ class OptStruct:
 		self.e_cache = np.zeros((self.m, 2)) # 第一列表示valid，第二列表示E值
 
 # 计算E值
-def calc_E_k(opt_struct, k):
-	gx_k = ((opt_struct.alphas * opt_struct.class_label).reshape(opt_struct.m, ) * (opt_struct.data_input[k, :] * opt_struct.data_input).sum(axis=1)).sum() + opt_struct.b
+def calc_E_k(opt_struct, k, kernel=None, **kwargs):
+	if kernel is None:
+		gx_k = ((opt_struct.alphas * opt_struct.class_label).reshape(opt_struct.m, ) * (opt_struct.data_input[k, :] * opt_struct.data_input).sum(axis=1)).sum() + opt_struct.b
+	elif kernel == 'poly':
+		p = kwargs.get('p')
+		kernel_value_arr = np.zeros((opt_struct.m, ))
+		for i in xrange(opt_struct.m):
+			kernel_value_arr[i] = poly_kernel(opt_struct.data_input[i, :], opt_struct.data_input[k, :], p)
+		gx_k = ((opt_struct.alphas * opt_struct.class_label).reshape(opt_struct.m,) * kernel_value_arr).sum() + opt_struct.b
+	elif kernel == 'rbf':
+		sigma = kwargs.get('sigma')
+		kernel_value_arr = np.zeros((opt_struct.m, ))
+		for i in xrange(opt_struct.m):
+			kernel_value_arr[i] = rbf_kernel(opt_struct.data_input[i, :], opt_struct.data_input[k, :], sigma)
+		gx_k = ((opt_struct.alphas * opt_struct.class_label).reshape(opt_struct.m,) * kernel_value_arr).sum() + opt_struct.b
 	E_k = gx_k - opt_struct.class_label[k, 0]
 	return E_k
 
 # 根据Ei和Ej的差最大的原则选择j
-def select_j(opt_struct, i, E_i):
+def select_j(opt_struct, i, E_i, kernel=None, **kwargs):
 	opt_struct.e_cache[i] = [1, E_i] # set index i as [valid, E_i]
 	valid_e_cahce_list = np.nonzero(opt_struct.e_cache[:, 0])[0]
-	max_delta_E = -1
+	max_delta_E = 0
 	max_k = -1
 	E_j = 0
 	if len(valid_e_cahce_list) > 1:
 		for k in valid_e_cahce_list:
-			if k == 1:
+			if k == i:
 				continue
-			E_k = calc_E_k(opt_struct, k) # 计算第k个数据点的E值
+			E_k = calc_E_k(opt_struct, k, kernel, **kwargs) # 计算第k个数据点的E值
 			delta_E = np.abs(E_i - E_k)
 			if delta_E > max_delta_E:
 				max_k = k
@@ -139,21 +153,21 @@ def select_j(opt_struct, i, E_i):
 		return max_k, E_j # 返回deltaE最大的数据点对应的index和E值
 	else: # 随机选
 		j = select_j_randomly(i, opt_struct.m)
-		E_j = calc_E_k(opt_struct, j)
+		E_j = calc_E_k(opt_struct, j, kernel, **kwargs)
 		return j, E_j
 
 # 更新E值表
-def update_E_k(opt_struct, k):
-	E_k = calc_E_k(opt_struct, k)
+def update_E_k(opt_struct, k, kernel, **kwargs):
+	E_k = calc_E_k(opt_struct, k, kernel, **kwargs)
 	opt_struct.e_cache[k] = [1, E_k]
 
 
-def inner_loop(i, opt_struct):
+def inner_loop(i, opt_struct, kernel=None, **kwargs):
 	# i是外层循环选择的alpha下标
-	E_i = calc_E_k(opt_struct, i)
+	E_i = calc_E_k(opt_struct, i, kernel, **kwargs)
 	if (opt_struct.class_label[i, 0] * E_i < -opt_struct.toler and opt_struct.alphas[i, 0] < opt_struct.C) or \
 		(opt_struct.class_label[i, 0] * E_i > opt_struct.toler and opt_struct.alphas[i, 0] > 0):
-		j, E_j = select_j(opt_struct, i, E_i)
+		j, E_j = select_j(opt_struct, i, E_i, kernel, **kwargs)
 		alpha_i_old = opt_struct.alphas[i, 0].copy()
 		alpha_j_old = opt_struct.alphas[j, 0].copy()
 
@@ -167,24 +181,53 @@ def inner_loop(i, opt_struct):
 			print 'L == H'
 			return 0
 
-		eta = (opt_struct.data_input[i, :] ** 2).sum() + (opt_struct.data_input[j, :] ** 2).sum() - 2 * (opt_struct.data_input[i, :] * opt_struct.data_input[j, :]).sum()
+		if kernel is None:
+			eta = (opt_struct.data_input[i, :] ** 2).sum() + (opt_struct.data_input[j, :] ** 2).sum() - 2 * (opt_struct.data_input[i, :] * opt_struct.data_input[j, :]).sum()
+		elif kernel == 'poly':
+			p = kwargs.get('p')
+			eta = poly_kernel(opt_struct.data_input[i, :], opt_struct.data_input[i, :], p) + \
+				poly_kernel(opt_struct.data_input[j, :], opt_struct.data_input[j, :], p) - \
+				2 * (poly_kernel(opt_struct.data_input[i, :], opt_struct.data_input[j, :], p))
+		elif kernel == 'rbf':
+			sigma = kwargs.get('sigma')
+			eta = rbf_kernel(opt_struct.data_input[i, :], opt_struct.data_input[i, :], sigma) + \
+				rbf_kernel(opt_struct.data_input[j, :], opt_struct.data_input[j, :], sigma) - \
+				2 * (rbf_kernel(opt_struct.data_input[i, :], opt_struct.data_input[j, :], sigma))
 		if eta <= 0:
 			print 'eta <= 0'
 			return 0
 		opt_struct.alphas[j, 0] += opt_struct.class_label[j, 0] * (E_i - E_j) / eta
 		opt_struct.alphas[j, 0] = clip_alpha(opt_struct.alphas[j, 0], H, L)
-		update_E_k(opt_struct, j)
+		update_E_k(opt_struct, j, kernel, **kwargs)
 		if abs(opt_struct.alphas[j, 0] - alpha_j_old) < 0.00001:
 			print 'j not moving enough'
 			return 0
 		opt_struct.alphas[i, 0] += opt_struct.class_label[i, 0] * opt_struct.class_label[j, 0] * (alpha_j_old - opt_struct.alphas[j, 0])
-		update_E_k(opt_struct, i)
+		update_E_k(opt_struct, i, kernel, **kwargs)
+
+
+		if kernel is None:
+			K_ii = (opt_struct.data_input[i, :] * opt_struct.data_input[i, :]).sum()
+			K_ij = (opt_struct.data_input[j, :] * opt_struct.data_input[i, :]).sum()
+			K_jj = (opt_struct.data_input[j, :] * opt_struct.data_input[j, :]).sum()
+		elif kernel == 'poly':
+			p = kwargs.get('p')
+			K_ii = poly_kernel(opt_struct.data_input[i, :], opt_struct.data_input[i, :], p)
+			K_ij = poly_kernel(opt_struct.data_input[i, :], opt_struct.data_input[j, :], p)
+			K_jj = poly_kernel(opt_struct.data_input[j, :], opt_struct.data_input[j, :], p)
+		elif kernel == 'rbf':
+			sigma = kwargs.get('sigma')
+			K_ii = rbf_kernel(opt_struct.data_input[i, :], opt_struct.data_input[i, :], sigma)
+			K_ij = rbf_kernel(opt_struct.data_input[i, :], opt_struct.data_input[j, :], sigma)
+			K_jj = rbf_kernel(opt_struct.data_input[j, :], opt_struct.data_input[j, :], sigma)
+
 		b_i_new = -E_i - \
-				opt_struct.class_label[i, 0] * (opt_struct.data_input[i, :] * opt_struct.data_input[i, :]).sum() * (opt_struct.alphas[i, 0] - alpha_i_old) - \
-				opt_struct.class_label[j, 0] * (opt_struct.data_input[j, :] * opt_struct.data_input[i, :]).sum() * (opt_struct.alphas[j, 0] - alpha_j_old) + opt_struct.b
+				opt_struct.class_label[i, 0] * K_ii * (opt_struct.alphas[i, 0] - alpha_i_old) - \
+				opt_struct.class_label[j, 0] * K_ij * (opt_struct.alphas[j, 0] - alpha_j_old) + opt_struct.b
 		b_j_new = -E_j - \
-				opt_struct.class_label[i, 0] * (opt_struct.data_input[i, :] * opt_struct.data_input[j, :]).sum() * (opt_struct.alphas[i, 0] - alpha_i_old) - \
-				opt_struct.class_label[j, 0] * (opt_struct.data_input[j, :] * opt_struct.data_input[j, :]).sum() * (opt_struct.alphas[j, 0] - alpha_j_old) + opt_struct.b
+				opt_struct.class_label[i, 0] * K_ij * (opt_struct.alphas[i, 0] - alpha_i_old) - \
+				opt_struct.class_label[j, 0] * K_jj * (opt_struct.alphas[j, 0] - alpha_j_old) + opt_struct.b
+
 		if 0 < opt_struct.alphas[i, 0] < opt_struct.C:
 			opt_struct.b = b_i_new
 		elif 0 < opt_struct.alphas[j, 0] < opt_struct.C:
@@ -196,7 +239,9 @@ def inner_loop(i, opt_struct):
 	else:
 		return 0
 
-def outer_loop(data_input, class_label, C, toler, maxIter):
+
+
+def outer_loop(data_input, class_label, C, toler, maxIter, kernel=None, **kwargs):
 	opt_struct = OptStruct(data_input, class_label, C, toler)
 	iteration = 0
 	entire_set = True
@@ -206,13 +251,13 @@ def outer_loop(data_input, class_label, C, toler, maxIter):
 		alpha_pair_change = 0
 		if entire_set:
 			for i in xrange(opt_struct.m):
-				alpha_pair_change += inner_loop(i, opt_struct)
+				alpha_pair_change += inner_loop(i, opt_struct, kernel, **kwargs)
 				print 'full_set, iter: %s, i: %s, pairs change %s' % (iteration, i, alpha_pair_change)
 			iteration += 1
 		else:
 			data_no_bound = get_non_bound_alpha(opt_struct.alphas, opt_struct.C)
 			for i in data_no_bound:
-				alpha_pair_change += inner_loop(i, opt_struct)
+				alpha_pair_change += inner_loop(i, opt_struct, kernel, **kwargs)
 				print 'no bound, iter %s, i: %s, pairs change %s' % (iteration, i, alpha_pair_change)
 			iteration += 1
 		if entire_set:
@@ -226,7 +271,8 @@ def calc_w(alphas, class_label, data_input):
 	w = ((alphas * class_label) * data_input).sum(axis=0)
 	return w
 
-if __name__ == '__main__':
+
+def test_smo():
 	data_path = '../data/testSet.txt'
 	data_arr, label_arr = load_dataset(data_path)
 	# simple smo
@@ -244,3 +290,40 @@ if __name__ == '__main__':
 	print 'data_0: sign %s, label: %s' % (np.sign(data_arr[0, :].dot(w) + b), label_arr[0])
 	print 'data_1: sign %s, label: %s' % (np.sign(data_arr[1, :].dot(w) + b), label_arr[1])
 	print 'data_2: sign %s, label: %s' % (np.sign(data_arr[2, :].dot(w) + b), label_arr[2])
+
+
+def test_rbf():
+	data_path = '../data/testSetRBF.txt'
+	data_arr, label_arr = load_dataset(data_path)
+	sigma = 0.15
+	b, alphas = outer_loop(data_arr, label_arr, 200, 0.0001, 10000, 'rbf', sigma=sigma)
+	support_vector_index = get_support_vector_index(alphas)
+	print 'there are %s suspport vector' % len(support_vector_index)
+
+	m, n = np.shape(data_arr)
+	error_count = 0
+	for i in xrange(m):
+		kernel_value_arr = np.zeros((m,))
+		for j in support_vector_index:
+			kernel_value_arr[j] = rbf_kernel(data_arr[j, :], data_arr[i, :], sigma)
+		predict = ((alphas * label_arr).reshape(m, ) * kernel_value_arr).sum() + b
+		if np.sign(predict) != np.sign(label_arr[i]):
+			error_count += 1
+	print 'the training error rate is %s' % (error_count * 1.0 / m)
+
+	data_path = '../data/testSetRBF2.txt'
+	data_arr, label_arr = load_dataset(data_path)
+	m, n = np.shape(data_arr)
+	error_count = 0
+	for i in xrange(m):
+		kernel_value_arr = np.zeros((m,))
+		for j in support_vector_index:
+			kernel_value_arr[j] = rbf_kernel(data_arr[j, :], data_arr[i, :], sigma)
+		predict = ((alphas * label_arr).reshape(m, ) * kernel_value_arr).sum() + b
+		if np.sign(predict) != np.sign(label_arr[i]):
+			error_count += 1
+	print 'the test error rate is %s' % (error_count * 1.0 / m)
+
+if __name__ == '__main__':
+	# test_smo()
+	test_rbf()
