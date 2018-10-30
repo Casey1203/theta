@@ -16,3 +16,10 @@ def load_dataset(file_name):
 	label_arr = np.array(label_mat)
 	label_arr = label_arr.reshape((len(label_arr), 1))
 	return data_arr, label_arr
+
+
+def load_simple_data():
+	data_input = np.array([[1., 2.1], [2., 1.1], [1.3, 1.], [1., 1.], [2., 1.]])
+	class_label = np.array([1., 1., -1., -1., 1.])
+
+	return data_input, class_label
