@@ -28,7 +28,7 @@ class Adaboost:
 			stump, error_rate = build_stump(data_input, class_label, D)
 			stump['alpha'] = calculate_alpha(error_rate)
 			self.G[m] = stump
-			D_prime = np.exp(stump['alpha'] * stump['predict_value'] * class_label) * D
+			D_prime = np.exp(-stump['alpha'] * stump['predict_value'] * class_label) * D
 			D = D_prime / D_prime.sum()
 			aggregate_label += self.G[m]['alpha'] * self.G[m]['predict_value']
 			aggregate_error_rate = (np.multiply(np.sign(aggregate_label) != class_label, np.ones((N,)))).sum() / N
@@ -59,7 +59,7 @@ class Adaboost:
 
 def test():
 	data_input, class_label = load_simple_data()
-	model = Adaboost(40)
+	model = Adaboost(100)
 	model.fit(data_input, class_label)
 
 

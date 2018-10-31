@@ -24,7 +24,7 @@ def build_stump(data_input, class_label, D):
 		feat_min = data_input[:, i].min()
 		feat_max = data_input[:, i].max()
 		step_size = float(feat_max - feat_min) / num_step
-		for j in xrange(num_step):
+		for j in xrange(-1, num_step+1):
 			for threshold_inequality in ['lower_than', 'higher_than']:
 				threshold_value = feat_min + j * step_size
 				predict_value = stump_classify(data_input, i, threshold_value, threshold_inequality)
