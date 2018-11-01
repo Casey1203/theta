@@ -23,3 +23,17 @@ def load_simple_data():
 	class_label = np.array([1., 1., -1., -1., 1.])
 
 	return data_input, class_label
+
+
+def load_horse_colic_dataset(file_name):
+	# num_feat = len(open(file_name).readline().split('\t')) # split by tab
+	fr = open(file_name)
+	data_mat = []
+	label_mat = []
+	for line in fr.readlines():
+		line_arr = line.strip().split('\t')
+		data_mat.append([float(x) for x in line_arr[:-1]])
+		label_mat.append(int(float(line_arr[-1])))
+	data_arr = np.array(data_mat)
+	label_arr = np.array(label_mat)
+	return data_arr, label_arr

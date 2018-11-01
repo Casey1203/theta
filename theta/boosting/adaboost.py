@@ -4,7 +4,8 @@
 
 import numpy as np
 from stump import build_stump, stump_classify
-from theta.util.file_loader import load_simple_data
+from theta.util.file_loader import load_simple_data, load_horse_colic_dataset
+from theta.metrics.roc import plot_roc
 
 def calculate_error_rate(G_m, data_input, class_label):
 	predict_label = np.sign(G_m(data_input))
@@ -35,36 +36,40 @@ class Adaboost:
 			print 'iter_num: %s, total error rate: %s' % (m, aggregate_error_rate)
 			if aggregate_error_rate == 0.:
 				break
-		print self.G
+		return self.G, aggregate_label
 
 	def evaluate(self, data_input, class_label):
-		model_output = np.zeros(class_label.shape)
-		for m in xrange(self.M):
-			model_output += self.alpha[m] * self.G[m](data_input)
-		model_output = np.sign(model_output)
-		error_rate = (model_output == class_label) / len(class_label)
+		N = np.shape(data_input)[0]
+		num_stump = len(self.G)
+		aggregate_label = np.zeros((N, ))
+		error_vector = np.ones((N, ))
+		for m in xrange(num_stump):
+			output_label = stump_classify(data_input, self.G[m]['dimension'], self.G[m]['threshold_value'], self.G[m]['threshold_inequality'])
+			aggregate_label += self.G[m]['alpha'] * output_label
+		error_vector[np.sign(aggregate_label) == class_label] = 0
+		error_rate = float(error_vector.sum()) / N
 		return error_rate
 
 	def predict(self, data_input):
-		m = np.shape(data_input)[0]
+		N = np.shape(data_input)[0]
 		num_stump = len(self.G)
-		aggregate_label = np.zeros((m, ))
+		aggregate_label = np.zeros((N, ))
 		for m in xrange(num_stump):
 			output_label = stump_classify(data_input, self.G[m]['dimension'], self.G[m]['threshold_value'], self.G[m]['threshold_inequality'])
 			aggregate_label += self.G[m]['alpha'] * output_label
 		return np.sign(aggregate_label)
 
 
-
-
-
-
 def test():
-	data_input, class_label = load_simple_data()
-	model = Adaboost(100)
-	model.fit(data_input, class_label)
-	print model.predict(np.array([[5, 5], [0, 0]]))
-
+	# data_input, class_label = load_simple_data()
+	data_input, class_label = load_horse_colic_dataset('../data/horseColicTraining2.txt')
+	model = Adaboost(10)
+	_, aggregate_label = model.fit(data_input, class_label)
+	# print model.predict(np.array([[5, 5], [0, 0]]))
+	# data_input, class_label = load_horse_colic_dataset('../data/horseColicTest2.txt')
+	# test_error_rate = model.evaluate(data_input, class_label)
+	# print 'test_error_rate: %s' % test_error_rate
+	plot_roc(aggregate_label, class_label)
 
 if __name__ == '__main__':
 	test()
