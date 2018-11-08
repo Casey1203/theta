@@ -3,6 +3,7 @@
 # @Author  : jia
 
 import numpy as np
+import gzip
 
 def load_dataset(file_name):
 	data_mat = []
@@ -34,6 +35,23 @@ def load_horse_colic_dataset(file_name):
 		line_arr = line.strip().split('\t')
 		data_mat.append([float(x) for x in line_arr[:-1]])
 		label_mat.append(int(float(line_arr[-1])))
+	data_arr = np.array(data_mat)
+	label_arr = np.array(label_mat)
+	return data_arr, label_arr
+
+
+def load_mnist_data(x_file_name, y_file_name):
+	data_mat = []
+	label_mat = []
+	with gzip.open(x_file_name, 'rb') as fr:
+		for line in fr.readlines():
+			print line
+			data_mat.append(line)
+
+	with gzip.open(y_file_name, 'rb') as fr:
+		for line in fr.readlines():
+			print line
+			label_mat.append(line)
 	data_arr = np.array(data_mat)
 	label_arr = np.array(label_mat)
 	return data_arr, label_arr
