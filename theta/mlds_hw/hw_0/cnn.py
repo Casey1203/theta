@@ -9,16 +9,29 @@ import numpy as np
 def convert_to_one_hot(y, C):
 	return np.eye(C)[y.reshape(-1)]
 
+def neural_net(x, weight, bias):
+	tf.add(tf.)
+
 def train(data_input, class_label, num_epoch, batch_size):
 	# 定义placeholder
 	m, n = data_input.shape
 	label_num = 10
-	X = tf.placeholder(dtype=tf.float32, shape=[None, n], name='data_input')
+	num_hidden_layer_1 = 256
+	num_hidden_layer_2 = 256
+	X = tf.placeholder(dtype=tf.float32, shape=[None, num_hidden_layer_1], name='data_input')
 	y = tf.placeholder(dtype=tf.float32, shape=[None, label_num], name='class_label')
 
 	# 定义variable
-	W = tf.Variable(tf.zeros([n, label_num]))
-	b = tf.Variable(tf.zeros([label_num]) + 0.1)
+	weight = {
+		'h1': tf.Variable(tf.random_normal([n, num_hidden_layer_1], name='h1')),
+		'h2': tf.Variable(tf.random_normal([num_hidden_layer_1, num_hidden_layer_2], name='h2')),
+		'out': tf.Variable(tf.random_normal([num_hidden_layer_2, label_num], name='out'))
+	}
+	bias = {
+		'b1': tf.Variable(tf.random_normal([num_hidden_layer_1], name='b1')),
+		'b2': tf.Variable(tf.random_normal([num_hidden_layer_2], name='b2')),
+		'out': tf.Variable(tf.random_normal([label_num], name='out'))
+	}
 
 	predict_y = tf.nn.softmax(tf.matmul(X, W) + b)
 	tf.add_to_collection('network-output', predict_y)
