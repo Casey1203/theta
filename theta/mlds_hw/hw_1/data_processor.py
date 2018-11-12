@@ -11,6 +11,7 @@ WORD_VECTOR_SIZE = 300
 MIN_WORD_COUNT = 20
 STOP_WORD = open('../../data/stopwords.txt', 'r').read().split('\n')
 OPTION_LIST = ['a)', 'b)', 'c)', 'd)', 'e)']
+TRAINING_DATA_SIZE = 100000
 
 def refine(data):
 	# 只取出字符部分
@@ -45,12 +46,15 @@ def get_testing_data_info(testing_data):
 
 
 def process_training_and_testing_dataset():
+	print 'load word vector model...'
 	word_vector = KeyedVectors.load_word2vec_format('../../model/word_vector.bin', binary=True)
 	training_data = [] # list of sentences
 	all_words = "" # words in sentence
 	# load training data
+	print 'load and process training data...'
 	for filename in os.listdir('../../data/Holmes_Training_Data'):
 		with codecs.open('../../data/Holmes_Training_Data/%s' % filename, 'r', encoding='utf-8', errors='ignore') as f:
+			print 'process %s' % filename
 			parse_flag = False
 			data = ""
 			for line in f:
@@ -66,20 +70,23 @@ def process_training_and_testing_dataset():
 			all_words += refine(data)
 
 	# load test data
+	print 'load and process testing data...'
 	testing_word = ""
 	testing_data_df = pd.read_csv('../../data/testing_data.csv', encoding='utf-8')
 	testing_data = testing_data_df.to_dict(orient='records')
 	for i in xrange(len(testing_data)):
+		print 'process no. %s testing case, %s to go...' % (i, len(testing_data) - i - 1)
 		testing_data[i]['question'] = [refine(word) if word != '_____' else '_____' for word in testing_data[i]['question'].lower().split()]
 		testing_word += refine(' '.join(testing_data[i]['question'])).lower() + ' '
 		for option in OPTION_LIST:
 			testing_data[i][option] = refine(testing_data[i][option])
 			testing_word += testing_data[i][option].lower() + ' '
 	testing_word = testing_word[:-1]
-
+	print 'get testing data info...'
 	max_test_length, min_test_length, average_length, max_space_index, min_space_index, average_space_index, seq_max_length = \
 		get_testing_data_info(testing_data)
 	# embedding testing data
+	print 'embedding testing data...'
 	embedding_test_X = []
 	embedding_test_Y = []
 	for test_case in testing_data:
@@ -87,16 +94,25 @@ def process_training_and_testing_dataset():
 		for option in OPTION_LIST:
 			embedding_test_X.append([pre_space_vector, option_vector_dict[option]])
 			embedding_test_Y.append(post_space_vector)
-
+	dump_embedding_testing_data(embedding_test_X, embedding_test_Y)
 	# embedding training data
 	embedding_training_X = []
 	embedding_training_Y = []
-
+	print 'embedding training data...'
+	counter = 1
+	post_fix = -1
 	for sentence in training_data:
 		valid_sentence_flag, pre_context_vector, post_context_vector, mid_context_vector = build_training_sentence_embedding(sentence, word_vector, max_test_length, min_test_length)
 		if valid_sentence_flag:
 			embedding_training_X.append([pre_context_vector, mid_context_vector])
 			embedding_training_Y.append(post_context_vector)
+			counter += 1
+		if counter % TRAINING_DATA_SIZE == 0:
+			counter = 1
+			post_fix += 1
+			dump_embedding_training_data(embedding_training_X, embedding_training_Y, post_fix)
+			embedding_training_X = []
+			embedding_training_Y = []
 	return embedding_training_X, embedding_training_Y, embedding_test_X, embedding_test_Y
 
 
@@ -162,13 +178,34 @@ def build_training_sentence_embedding(sentence, word_vector, max_test_length, mi
 
 
 def dump_embedding_data(embedding_train_X, embedding_train_Y, embedding_test_X, embedding_test_Y):
-	embedding_train_data = {'embedding_train_X': embedding_train_X, 'embedding_train_Y': embedding_train_Y}
+
 	embedding_test_data = {'embedding_test_X': embedding_test_X, 'embedding_test_Y': embedding_test_Y}
-	pickle.dump(embedding_train_data, open('../../data/embedding_train_data.pkl', 'wb'))
+	for i in xrange(len(embedding_train_X) / TRAINING_DATA_SIZE):
+		print 'dump embedding training data, postfix %s...' % i
+		save_index = TRAINING_DATA_SIZE * i
+		embedding_train_data = {
+			'embedding_train_X': embedding_train_X[save_index: save_index+TRAINING_DATA_SIZE],
+			'embedding_train_Y': embedding_train_Y[save_index: save_index+TRAINING_DATA_SIZE]}
+
+		pickle.dump(embedding_train_data, open('../../data/embedding_train_data_%s.pkl' % i, 'wb'))
+	print 'dump embedding testing data...'
 	pickle.dump(embedding_test_data, open('../../data/embedding_test_data.pkl', 'wb'))
+
+
+def dump_embedding_testing_data(embedding_test_X, embedding_test_Y):
+
+	embedding_test_data = {'embedding_test_X': embedding_test_X, 'embedding_test_Y': embedding_test_Y}
+	print 'dump embedding testing data...'
+	pickle.dump(embedding_test_data, open('../../data/embedding_test_data.pkl', 'wb'))
+
+def dump_embedding_training_data(embedding_train_X, embedding_train_Y, name):
+	embedding_train_data = {
+		'embedding_train_X': embedding_train_X,
+		'embedding_train_Y': embedding_train_Y}
+	print 'dump embedding training data...'
+	pickle.dump(embedding_train_data, open('../../data/embedding_train_data_%s.pkl' % name, 'wb'))
 
 
 if __name__ == '__main__':
 	embedding_training_X, embedding_training_Y, embedding_test_X, embedding_test_Y = \
 		process_training_and_testing_dataset()
-	dump_embedding_data(embedding_training_X, embedding_training_Y, embedding_test_X, embedding_test_Y)
