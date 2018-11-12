@@ -113,6 +113,8 @@ def process_training_and_testing_dataset():
 			dump_embedding_training_data(embedding_training_X, embedding_training_Y, post_fix)
 			embedding_training_X = []
 			embedding_training_Y = []
+	if len(embedding_training_X):
+		dump_embedding_training_data(embedding_training_X, embedding_training_Y, post_fix)
 	return embedding_training_X, embedding_training_Y, embedding_test_X, embedding_test_Y
 
 
