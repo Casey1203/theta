@@ -42,7 +42,7 @@ def train(data_input, class_label, num_epoch, batch_size):
 	tf.add_to_collection('network-output', logits)
 	# 定义Loss function
 	cross_entropy = tf.reduce_mean(
-		tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=logits)
+		tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logits)
 	)
 	# 定义optimizer op
 	train_model = tf.train.AdamOptimizer(learning_rate=0.01).minimize(cross_entropy)

@@ -34,32 +34,34 @@ class RNN:
 			'out': tf.Variable(tf.random_normal([self.n_classes]), name='out')
 		}
 
+	def build_graph(self, x, config):
 
-	def train(self, train_X, train_Y, train_config):
-		n_step = train_config['n_step']
-		n_input = train_config['n_input']
-		batch_size = train_config['batch_size']
-		n_layer = train_config['n_layer']
 		keep_prob = train_config['keep_prob']
-		lr = train_config['lr']
-		n_epoch = train_config['n_epoch']
-		data_size = len(train_X)
-		print 'shape of train_X: ', np.shape(train_X)
-		n_batch = data_size / batch_size + 1
-		X = tf.placeholder(dtype='float', shape=[None, n_step, n_input])
-		y = tf.placeholder(dtype='float', shape=[None, self.n_classes])
-		X_ = tf.transpose(X, [1, 0, 2]) # permuting batch_size and n_step
-		X_ = tf.reshape(X_, [-1, n_input]) # reshape to (n_step * batch_size, n_input)
-		X_ = tf.split(X_, n_step, 0) # split to get a list of n_step tensors of shape(batch_size, n_input)
 
 		rnn_cell = tf.nn.rnn_cell.BasicLSTMCell(self.n_hidden, state_is_tuple=True)
 		if keep_prob < 1:
 			rnn_cell = tf.nn.rnn_cell.DropoutWrapper(rnn_cell, output_keep_prob=keep_prob)
-		# rnn_cell = tf.nn.rnn_cell.MultiRNNCell([rnn_cell] * n_layer, state_is_tuple=True)
+		outputs, _ = tf.nn.dynamic_rnn(rnn_cell, x, dtype=tf.float32)
+		return tf.matmul(outputs[:, -1, :], self.weights['out']) + self.bias['out']
 
-		outputs, _ = tf.nn.static_rnn(rnn_cell, X_, dtype=tf.float32)
+	def train(self, train_X, train_Y, train_config):
+		batch_size = train_config['batch_size']
+		n_layer = train_config['n_layer']
+		n_step = train_config['n_step']
+		n_input = train_config['n_input']
+		x = tf.placeholder(dtype='float', shape=[None, n_step, n_input]) # batch_size, sequence_length, frame_size
+		y = tf.placeholder(dtype='float', shape=[None, n_input]) # batch_size, frame_size
+		lr = train_config['lr']
+		n_epoch = train_config['n_epoch']
+		data_size = len(train_X)
+		n_batch = data_size / batch_size + 1
+		# X = tf.placeholder(dtype='float', shape=[None, n_step, n_input])
+		# y = tf.placeholder(dtype='float', shape=[None, self.n_classes])
+		# X_ = tf.transpose(X, [1, 0, 2]) # permuting batch_size and n_step
+		# X_ = tf.reshape(X_, [-1, n_input]) # reshape to (n_step * batch_size, n_input)
+		# X_ = tf.split(X_, n_step, 0) # split to get a list of n_step tensors of shape(batch_size, n_input)
+		predict = self.build_graph(x, train_config)
 
-		predict = tf.matmul(outputs[-1], self.weights['out']) + self.bias['out']
 		seperate_cost = tf.losses.cosine_distance(y, predict, axis=1)
 
 		cost = tf.reduce_mean(seperate_cost)
@@ -77,12 +79,12 @@ class RNN:
 					# batch_X = batch_X.reshape((batch_size, n_step, n_input))
 					# batch_Y = batch_Y.reshape((batch_size, n_input))
 
-					sess.run(optimizer, feed_dict={X: batch_X, y: batch_Y})
+					sess.run(optimizer, feed_dict={x: batch_X, y: batch_Y})
 
 					if batch_number % DISPLAY_STEP == 0:
-						p = sess.run(predict, feed_dict={X: batch_X})
+						p = sess.run(predict, feed_dict={x: batch_X})
 						accuracy = predict_quality(p, batch_Y, 0.4)
-						loss = sess.run(cost, feed_dict={X: batch_X, y: batch_Y})
+						loss = sess.run(cost, feed_dict={x: batch_X, y: batch_Y})
 						print 'Epoch: %s, batch number: %s, batch loss: %s, training accuracy: %s' % (epoch, batch_number, loss, accuracy)
 				save_path = '../../model/holmes_lm-%s.ckpt' % epoch
 				saver = tf.train.Saver()
