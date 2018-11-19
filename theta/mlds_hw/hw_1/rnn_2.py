@@ -61,3 +61,24 @@ class RNNModel(object):
 			output_words = tf.argmax(self.probs, axis=1)
 			output_words = tf.cast(output_words, tf.int32)
 			self.equal = tf.equal(output_words, tf.reshape(self.y, [-1]))
+
+def train(sentences_list, n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled, learning_rate, grad_clip, n_epoch):
+	n_batch = len(sentences_list) / batch_size
+	sentences_list = sentences_list[:n_batch * batch_size]
+	with tf.Graph().as_default():
+		with tf.Session() as sess:
+			model = RNNModel(n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled)
+			global_step = tf.Variable(initial_value=0, name='global_step', trainable=False)
+			optimizer = tf.train.AdamOptimizer(learning_rate)
+			tvars = tf.trainable_variables()
+			grads, _ = tf.clip_by_global_norm(tf.gradients(model.cost, tvars), clip_norm=grad_clip)
+			train_op = optimizer.apply_gradients(zip(grads, tvars), global_step=global_step)
+
+			# grad_summaries = []
+			saver = tf.train.Saver(tf.global_variables())
+			# init all variable
+			sess.run(tf.global_variables_initializer())
+
+			for epoch in xrange(n_epoch):
+				state = sess.run(model.init_state)
+				for batch in xrange(n_batch):
