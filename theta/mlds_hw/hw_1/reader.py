@@ -32,16 +32,17 @@ def load_holmes_raw_data(path):
 	return sentence_list, word
 
 def load_testing_data(path):
-	word = ""
-	testing_data_df = pd.read_csv('../../data/testing_data.csv', encoding='utf-8')
+	testing_data_df = pd.read_csv(path, encoding='utf-8')
 	testing_data = testing_data_df.to_dict(orient='records')
+	OPTION_LIST = ['a)', 'b)', 'c)', 'd)', 'e)']
+	test_sentences = []
 	for i in xrange(len(testing_data)):
-		testing_data[i]['question'] = [refine(word) if word != '_____' else '_____' for word in testing_data[i]['question'].lower().split()]
-		testing_word += refine(' '.join(testing_data[i]['question'])).lower() + ' '
+		testing_data[i]['question'] = ' '.join([refine(word) if word != '_____' else '_____' for word in testing_data[i]['question'].lower().split()])
+		test_sentence_list = []
 		for option in OPTION_LIST:
-			testing_data[i][option] = refine(testing_data[i][option])
-			testing_word += testing_data[i][option].lower() + ' '
-	testing_word = testing_word[:-1]
+			test_sentence_list.append(testing_data[i]['question'].replace('_____', option))
+		test_sentences.append(test_sentence_list)
+	return test_sentences
 
 
 if __name__ == '__main__':
