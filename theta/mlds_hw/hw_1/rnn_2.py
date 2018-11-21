@@ -99,7 +99,6 @@ def train(data, config):
 			saver = tf.train.Saver(tf.global_variables())
 			# init all variable
 			sess.run(tf.global_variables_initializer())
-			saver.restore(sess, 'model/model.ckpt-300')
 
 			for epoch in xrange(n_epoch):
 				state = sess.run(model.init_state)
