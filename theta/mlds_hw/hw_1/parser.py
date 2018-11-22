@@ -61,3 +61,11 @@ def embedded_word(word, stop_word, word_vector, word_vector_size):
 		return word_vector[word]
 	else:
 		return np.zeros((word_vector_size,))
+
+def test_sentence_info(test_sentences):
+	max_length = 0
+	for i, test_sentence in enumerate(test_sentences):
+		for j, sent in enumerate(test_sentence):
+			if len(sent.split()) > max_length:
+				max_length = len(sent.split())
+				print 'max_length', max_length

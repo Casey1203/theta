@@ -5,6 +5,8 @@ import codecs
 import re
 import pandas as pd
 
+OPTION_LIST = ['a)', 'b)', 'c)', 'd)', 'e)']
+
 def refine(data):
 	# 只取出字符部分
 	words = re.findall("[a-zA-Z'-]+", data)
@@ -40,10 +42,15 @@ def load_testing_data(path):
 		testing_data[i]['question'] = ' '.join([refine(word) if word != '_____' else '_____' for word in testing_data[i]['question'].lower().split()])
 		test_sentence_list = []
 		for option in OPTION_LIST:
-			test_sentence_list.append(testing_data[i]['question'].replace('_____', option))
+			test_sentence_list.append(testing_data[i]['question'].replace('_____', testing_data[i][option]))
 		test_sentences.append(test_sentence_list)
 	return test_sentences
 
+
+
+def load_test_answer(path):
+	test_answer_df = pd.read_csv(path, encoding='utf-8')
+	return test_answer_df['answer'].tolist()
 
 if __name__ == '__main__':
 	f = load_holmes_raw_data('../../data/Holmes_Training_Data/1ADAM10.TXT')

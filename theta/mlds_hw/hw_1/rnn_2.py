@@ -61,7 +61,10 @@ class RNNModel(object):
 				[tf.reshape(self.y, [-1])],
 				[tf.ones([batch_size * (n_step - 1)], dtype=tf.float32)]
 			)
+			seq_loss = tf.reshape(seq_loss, [batch_size, n_step - 1])
+			self.seq_loss_individual = seq_loss
 			self.seq_loss = tf.reduce_sum(seq_loss) / batch_size
+
 		with tf.name_scope('accuracy'):
 			output_words = tf.argmax(self.probs, axis=1)
 			output_words = tf.cast(output_words, tf.int32)
