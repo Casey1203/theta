@@ -15,7 +15,7 @@ from parser import clean_sentence, embedded_sentence_by_id, build_vocab, embedde
 import numpy as np
 
 def convert_to_one_hot(y, C):
-	return np.eye(C)[y.reshape(-1)]
+	return np.eye(C, dtype=int)[y.reshape(-1)]
 
 def build_encoder(X, hidden_size, n_layer, keep_prob, batch_size, name):
 	with tf.variable_scope(name, reuse=tf.AUTO_REUSE) as scope:
@@ -54,9 +54,10 @@ class RNNModel(object):
 		# 	# NCE loss
 		# 	loss = tf.nn.nce_loss(proj_w, proj_b, self.y, output, num_sampled, vocab_size)
 		# 	self.nce_cost = tf.reduce_sum(loss) / batch_size
-
+		fc_w = tf.Variable(tf.truncated_normal([2 * hidden_size, vocab_size], -0.1, 0.1), dtype=tf.float32)
+		fc_b = tf.Variable(tf.zeros([vocab_size]), dtype=tf.float32)
 		softmax_w = tf.transpose(proj_w)
-		self.logits = tf.matmul(output, softmax_w) + proj_b
+		self.logits = tf.matmul(output, fc_w) + fc_b
 		self.probs = tf.nn.softmax(self.logits)
 		with tf.name_scope('loss'):
 			cost = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.y)
@@ -66,7 +67,10 @@ class RNNModel(object):
 			# output_words = tf.cast(output_words, tf.int32)
 			correct_prediction = tf.equal(tf.argmax(self.probs, 1), tf.argmax(self.y, 1))
 			self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
+		self.fc_w = fc_w
+		self.output = output
+		self.outputs_forward = outputs_forward
+		self.outputs_backward = outputs_backward
 		print 'rnn network already.'
 
 
@@ -87,7 +91,7 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 	forward_id_s_list = forward_id_s_list[:n_batch * batch_size]
 	backward_id_s_list = backward_id_s_list[:n_batch * batch_size]
 	space_word_id_list = space_word_id_list[:n_batch * batch_size]
-	space_word_id_list = convert_to_one_hot(space_word_id_list, vocab_size)
+	space_word_one_hot_list = convert_to_one_hot(space_word_id_list, vocab_size)
 	with tf.Graph().as_default():
 		with tf.Session() as sess:
 			model = RNNModel(n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled)
@@ -108,11 +112,19 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 					start = time.time()
 					data_forward_batch = forward_id_s_list[(i-1) * batch_size: i * batch_size]
 					data_backward_batch = backward_id_s_list[(i-1) * batch_size: i * batch_size]
-					data_y_batch = space_word_id_list[(i-1) * batch_size: i * batch_size]
+					data_y_batch = space_word_one_hot_list[(i-1) * batch_size: i * batch_size]
 					feed_dict = {model.X_forward: data_forward_batch, model.X_backward: data_backward_batch, model.y: data_y_batch, model.keep_prob: keep_prob}
-					_, step, loss, accuracy = sess.run([train_op, global_step, model.loss, model.accuracy], feed_dict=feed_dict)
+					_, step, loss, accuracy, logits, y, fc_w, output, outputs_backward = sess.run([train_op, global_step, model.loss, model.accuracy, model.logits, model.y, model.fc_w, model.output, model.outputs_backward], feed_dict=feed_dict)
 					print "training step {}, epoch {}, batch {}/{}, loss: {:.4f}, accuracy: {:.4f}, time/batch: {:.3f}".\
 						format(step, epoch, i, n_batch, loss, accuracy, time.time()-start)
+					print 'logits', logits
+					print 'y', y
+					print 'fc_w'
+					print fc_w
+					print 'output'
+					print output
+					print 'outputs_backward'
+					print outputs_backward
 					current_step = tf.train.global_step(sess, global_step)
 					if current_step != 0 and (current_step % save_every == 0 or (epoch == n_epoch - 1 and i == n_batch-1)):
 						checkpoint_path = os.path.join(save_dir, 'model.ckpt')
@@ -125,11 +137,11 @@ def main():
 	stop_word = open('../../data/stopwords.txt', 'r').read().split('\n')
 	# word_vector = KeyedVectors.load_word2vec_format('../../model/word_vector.bin', binary=True)
 	n_step = 20
-	hidden_size = 400
+	hidden_size = 200
 	n_layer = 1
 	batch_size = 50
-	learning_rate = 0.02
-	grad_clip = 2.5
+	learning_rate = 0.2
+	grad_clip = 5
 	n_epoch = 2
 	data_path = '../../data/Holmes_Training_Data'
 	forward_embedding_data_path = os.path.join(data_path, 'forward_id_s_list.npy')
