@@ -10,119 +10,202 @@
 import tensorflow as tf
 from gensim.models import KeyedVectors
 from reader import load_holmes_raw_data
-import os
-from parser import sentence_parser, embedded_sentence, embedded_word
+import os, time, pickle
+from parser import clean_sentence, embedded_sentence_by_id, build_vocab, embedded_word_by_id
+import numpy as np
 
-def build_encoder(X, hidden_size, n_layer, n_step, n_input, keep_prob, batch_size):
-	# X_forward = tf.placeholder(shape=[batch_size, None, hidden_size]) # batch_size, time_steps, hidden_size
-	# X_backward = tf.placeholder(shape=[batch_size, None, hidden_size]) # batch_size, time_steps, hidden_size
-	# # y = tf.placeholder(dtype='float', shape=[None, n_input]) # batch_size, n_input
+def convert_to_one_hot(y, C):
+	return np.eye(C)[y.reshape(-1)]
 
-	cell = tf.nn.rnn_cell.BasicLSTMCell(hidden_size, forget_bias=0., state_is_tuple=True)
-	if keep_prob:
+def build_encoder(X, hidden_size, n_layer, keep_prob, batch_size, name):
+	with tf.variable_scope(name, reuse=tf.AUTO_REUSE) as scope:
+
+		cell = tf.nn.rnn_cell.LSTMCell(hidden_size, forget_bias=1, state_is_tuple=True)
 		cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=keep_prob)
-	# stacked rnn
-	cell = tf.nn.rnn_cell.MultiRNNCell([cell] * n_layer, state_is_tuple=True)
+		# stacked rnn
+		cell = tf.nn.rnn_cell.MultiRNNCell([cell] * n_layer, state_is_tuple=True)
 
-	init_state = cell.zero_state(batch_size, tf.float32)
-
-	X = tf.nn.dropout(X, keep_prob)
-
-	X = tf.reshape(X, [-1, n_input]) # reshape to (n_step * batch_size, n_input)
-	X = tf.split(X, n_step, 0) # split to get a list of n_step tensors of shape(batch_size, n_input)
-
-	outputs, states = tf.nn.dynamic_rnn(cell, X, initial_state=init_state, dtype=tf.float32, time_major=True)
+		init_state = cell.zero_state(batch_size, tf.float32)
+		outputs, states = tf.nn.dynamic_rnn(cell, X, initial_state=init_state, dtype=tf.float32)
 
 	return outputs, states
 
 class RNNModel(object):
-	def __init__(self, batch_size, hidden_size, n_layer, n_step, keep_prob, n_input, lr):
-		y = tf.placeholder(shape=[batch_size, n_input])
-		X_forward = tf.placeholder(shape=[batch_size, n_step, hidden_size]) # batch_size, time_steps, hidden_size
-		X_backward = tf.placeholder(shape=[batch_size, n_step, hidden_size]) # batch_size, time_steps, hidden_size
+	def __init__(self, n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled):
+		self.keep_prob = tf.placeholder(tf.float32)
+		self.y = tf.placeholder(dtype=tf.int32, shape=[None, vocab_size])
+		self.X_forward = tf.placeholder(dtype=tf.int32, shape=[None, n_step]) # batch_size, time_steps
+		self.X_backward = tf.placeholder(dtype=tf.int32, shape=[None, n_step]) # batch_size, time_steps
+		embedding = tf.Variable(tf.truncated_normal([vocab_size, hidden_size], -0.1, 0.1))
+		with tf.name_scope('embed'):
+			input_forward = tf.nn.embedding_lookup(embedding, self.X_forward)
+			input_forward = tf.nn.dropout(input_forward, self.keep_prob)
+			input_backward = tf.nn.embedding_lookup(embedding, self.X_backward)
+			input_backward = tf.nn.dropout(input_backward, self.keep_prob)
 
-		outputs_forward, states_forward = build_encoder(X_forward, hidden_size, n_layer, n_step, n_input, keep_prob, batch_size)
-		outputs_backward, states_backward = build_encoder(X_backward, hidden_size, n_layer, n_step, n_input, keep_prob, batch_size)
-		fc_weights = tf.Variable(tf.random_normal([2 * hidden_size, n_input]), name='out')
-		fc_bias = tf.Variable(tf.random_normal([n_input]), name='out')
+		outputs_forward, states_forward = build_encoder(input_forward, hidden_size, n_layer, self.keep_prob, batch_size, 'lstm')
+		outputs_backward, states_backward = build_encoder(input_backward, hidden_size, n_layer, self.keep_prob, batch_size, 'lstm')
+		output = tf.concat([outputs_forward[:, -1, :], outputs_backward[:, -1, :]], axis=1)
 
-		output = tf.concat([outputs_forward[-1, :, :], outputs_backward[-1, :, :]])
-		logits = tf.matmul(output, fc_weights) + fc_bias
+		proj_w = tf.get_variable('proj_w', shape=[vocab_size, 2 * hidden_size])
+		proj_b = tf.get_variable('proj_b', shape=[vocab_size])
+		# with tf.name_scope('nce_loss'):
+		# 	# labels = tf.reshape(self.y, [-1, 1])
+		# 	# NCE loss
+		# 	loss = tf.nn.nce_loss(proj_w, proj_b, self.y, output, num_sampled, vocab_size)
+		# 	self.nce_cost = tf.reduce_sum(loss) / batch_size
 
-		loss = tf.losses.mean_squared_error(y, logits)
+		softmax_w = tf.transpose(proj_w)
+		self.logits = tf.matmul(output, softmax_w) + proj_b
+		self.probs = tf.nn.softmax(self.logits)
+		with tf.name_scope('loss'):
+			cost = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.y)
+			self.loss = tf.reduce_mean(cost)
+		with tf.name_scope('accuracy'):
+			# output_words = tf.argmax(self.probs, axis=1, output_type=tf.int32)
+			# output_words = tf.cast(output_words, tf.int32)
+			correct_prediction = tf.equal(tf.argmax(self.probs, 1), tf.argmax(self.y, 1))
+			self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-		train_op = tf.train.GradientDescentOptimizer(lr).minimize(loss)
-
-		self._loss = loss
-		self._train_op = train_op
-
-		self._input_data_forward = X_forward
-		self._input_data_backward = X_backward
-		self._target = y
-		# self._final_state =
-
-	@property
-	def input_data_forward(self):
-		return self._input_data_forward
-
-	@property
-	def input_data_backward(self):
-		return self._input_data_backward
-
-	@property
-	def target(self):
-		return self._target
-
-	@property
-	def loss(self):
-		return self._loss
-
-	@property
-	def train_op(self):
-		return self._train_op
+		print 'rnn network already.'
 
 
+def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
+	n_step = config['n_step']
+	hidden_size = config['hidden_size']
+	n_layer = config['n_layer']
+	batch_size = config['batch_size']
+	vocab_size = config['vocab_size']
+	num_sampled = config['num_sampled']
+	learning_rate = config['learning_rate']
+	grad_clip = config['grad_clip']
+	n_epoch = config['n_epoch']
+	keep_prob = config['keep_prob']
+	save_every = config['save_every']
+	save_dir = config['save_dir']
+	n_batch = len(forward_id_s_list) / batch_size
+	forward_id_s_list = forward_id_s_list[:n_batch * batch_size]
+	backward_id_s_list = backward_id_s_list[:n_batch * batch_size]
+	space_word_id_list = space_word_id_list[:n_batch * batch_size]
+	space_word_id_list = convert_to_one_hot(space_word_id_list, vocab_size)
+	with tf.Graph().as_default():
+		with tf.Session() as sess:
+			model = RNNModel(n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled)
+			global_step = tf.Variable(initial_value=0, name='global_step', trainable=False)
+			optimizer = tf.train.AdamOptimizer(learning_rate)
+			tvars = tf.trainable_variables()
+			grads, _ = tf.clip_by_global_norm(tf.gradients(model.loss, tvars), clip_norm=grad_clip)
+			train_op = optimizer.apply_gradients(zip(grads, tvars), global_step=global_step)
+
+			# grad_summaries = []
+			saver = tf.train.Saver(tf.global_variables())
+			# init all variable
+			sess.run(tf.global_variables_initializer())
+
+			for epoch in xrange(n_epoch):
+				# state = sess.run(model.init_state)
+				for i in xrange(1, n_batch):
+					start = time.time()
+					data_forward_batch = forward_id_s_list[(i-1) * batch_size: i * batch_size]
+					data_backward_batch = backward_id_s_list[(i-1) * batch_size: i * batch_size]
+					data_y_batch = space_word_id_list[(i-1) * batch_size: i * batch_size]
+					feed_dict = {model.X_forward: data_forward_batch, model.X_backward: data_backward_batch, model.y: data_y_batch, model.keep_prob: keep_prob}
+					_, step, loss, accuracy = sess.run([train_op, global_step, model.loss, model.accuracy], feed_dict=feed_dict)
+					print "training step {}, epoch {}, batch {}/{}, loss: {:.4f}, accuracy: {:.4f}, time/batch: {:.3f}".\
+						format(step, epoch, i, n_batch, loss, accuracy, time.time()-start)
+					current_step = tf.train.global_step(sess, global_step)
+					if current_step != 0 and (current_step % save_every == 0 or (epoch == n_epoch - 1 and i == n_batch-1)):
+						checkpoint_path = os.path.join(save_dir, 'model.ckpt')
+						path = saver.save(sess, checkpoint_path, global_step=current_step)
+						print 'save model checkpoint to {}'.format(path)
 
 
 
 def main():
-	batch_size = 256
-	hidden_size = 800
-	n_layer = 2
-	n_step = 28
-	n_input = 300
-	learning_rate = 0.001
-	n_epoch = 2
-	word_vector_size = 300
-	keep_prob = 0.9
 	stop_word = open('../../data/stopwords.txt', 'r').read().split('\n')
-	word_vector = KeyedVectors.load_word2vec_format('../../model/word_vector.bin', binary=True)
+	# word_vector = KeyedVectors.load_word2vec_format('../../model/word_vector.bin', binary=True)
+	n_step = 20
+	hidden_size = 400
+	n_layer = 1
+	batch_size = 50
+	learning_rate = 0.02
+	grad_clip = 2.5
+	n_epoch = 2
 	data_path = '../../data/Holmes_Training_Data'
-	file_list = os.listdir(data_path)
-	sentences_list = []
-	for file_name in file_list:
-		sentence_list, _ = load_holmes_raw_data(file_name)
-		sentences_list += sentence_list
-	n_sentences = len(sentences_list)
-	n_batch = n_sentences / batch_size
-	sentences_list = sentences_list[:n_batch * batch_size]
-	model = RNNModel(batch_size, hidden_size, n_layer, n_step, keep_prob, n_input, learning_rate)
-	sess = tf.Session()
-	sess.run(tf.global_variables_initializer())
-	for epoch in xrange(n_epoch):
-		for i in xrange(1, n_batch):
-			batch_X_forward, batch_X_backward, batch_y = [], [], []
-			sentence_batch = sentences_list[(i-1)*batch_size: i*batch_size]
-			for sentence in sentence_batch:
-				is_succeed, forward_sentence, backward_sentence, mid_word = sentence_parser(sentence, 10, stop_word)
-				if is_succeed:
-					embedded_forward_sentence = embedded_sentence(forward_sentence, stop_word, word_vector, word_vector_size)
-					batch_X_forward.append(embedded_forward_sentence)
-					embedded_backward_sentence = embedded_sentence(backward_sentence, stop_word, word_vector, word_vector_size)
-					batch_X_backward.append(embedded_backward_sentence)
-					embedded_mid_word = embedded_word(mid_word, stop_word, word_vector, word_vector_size)
-					batch_y.append(embedded_mid_word)
-			fetches = [model.loss, ]
-			sess.run(train_op, feed_dict={X_forward: embedded_forward_sentence, })
+	forward_embedding_data_path = os.path.join(data_path, 'forward_id_s_list.npy')
+	backward_embedding_data_path = os.path.join(data_path, 'backward_id_s_list.npy')
+	space_word_embedding_data_path = os.path.join(data_path, 'space_word_id_list.npy')
+	vocab_path = os.path.join(data_path, 'vocab.pkl')
+	if os.path.exists(forward_embedding_data_path) and os.path.exists(vocab_path):
+		print 'load embedding data and vocab..'
+		forward_id_s_list = np.load(forward_embedding_data_path)
+		backward_id_s_list = np.load(backward_embedding_data_path)
+		space_word_id_list = np.load(space_word_embedding_data_path)
+		vocab_dict = pickle.load(open(vocab_path, 'rb'))
+		vocab, vocab_id_map = vocab_dict['vocab'], vocab_dict['vocab_id_map']
+	else:
+		print 'extract embedding data and vocab..'
+		file_list = os.listdir(data_path)
+		sentences_list = []
+		for file_name in file_list:
+			sentence_list, _ = load_holmes_raw_data(os.path.join(data_path, file_name))
+			sentences_list += sentence_list
+		# remove stop word
+		print 'remove stop word..'
+		for i, sentence in enumerate(sentences_list):
+			sentences_list[i] = clean_sentence(sentence, stop_word)
+		# add start and end mark
+		print 'add start and end mark...'
+		for i, sentence in enumerate(sentences_list):
+			sentences_list[i] = '<START> ' + sentence + ' <END>'
+		# remove too long sentence or too short sentence
+		print 'remove too long or too short sentence..'
+		sentences_list_bk = []
+		for i, sentence in enumerate(sentences_list):
+			if 4 <= len(sentence.split()) <= n_step:
+				sentences_list_bk.append(sentence)
+		sentences_list = sentences_list_bk
+		vocab, vocab_id_map = build_vocab(sentences_list)
+		print 'divide sentence into forward and backward sentence'
+		# divide forward and backward sentence
+		forward_sentences_list, backward_sentences_list = [], []
+		space_word_list = []
+		for i, sentence in enumerate(sentences_list):
+			sentence_word = sentence.split()
+			half_sentence_len = len(sentence_word) / 2
+			forward_sentence = ' '.join(sentence_word[:half_sentence_len])
+			space_word = sentence_word[half_sentence_len]
+			backward_sentence = ' '.join(sentence_word[half_sentence_len+1:])
+			forward_sentences_list.append(forward_sentence)
+			backward_sentences_list.append(backward_sentence)
+			space_word_list.append(space_word)
+		print 'map sentence to id'
+		# map sentence to id
+		forward_id_s_list, backward_id_s_list, space_word_id_list = [], [], []
+		for i, sentence in enumerate(forward_sentences_list):
+			forward_id_s_list.append(embedded_sentence_by_id(sentence, vocab_id_map, n_step))
+		for i, sentence in enumerate(backward_sentences_list):
+			backward_id_s_list.append(embedded_sentence_by_id(sentence, vocab_id_map, n_step))
+		for i, word in enumerate(space_word_list):
+			space_word_id_list.append(embedded_word_by_id(word, vocab_id_map))
+		forward_id_s_list = np.array(forward_id_s_list)
+		backward_id_s_list = np.array(backward_id_s_list)
+		space_word_id_list = np.array(space_word_id_list)
+		print 'save embedding data and vocab..'
+		np.save(os.path.join(data_path, 'forward_id_s_list.npy'), forward_id_s_list)
+		np.save(os.path.join(data_path, 'backward_id_s_list.npy'), backward_id_s_list)
+		np.save(os.path.join(data_path, 'space_word_id_list.npy'), space_word_id_list)
 
+		pickle.dump({'vocab': vocab, 'vocab_id_map': vocab_id_map}, open(vocab_path, 'wb'))
+	num_sampled = int(0.7 * len(vocab))
+	print 'num_sampled:', num_sampled
+	config = {
+		'n_step': n_step, 'hidden_size': hidden_size, 'n_layer': n_layer, 'batch_size': batch_size,
+		'vocab_size': len(vocab), 'num_sampled': num_sampled, 'learning_rate': learning_rate, 'grad_clip': grad_clip,
+		'n_epoch': n_epoch, 'keep_prob': 1, 'save_every': 100, 'save_dir': 'model/'
+	}
 
+	train(forward_id_s_list, backward_id_s_list, space_word_id_list, config)
+
+if __name__ == '__main__':
+	main()

@@ -53,14 +53,8 @@ def build_vocab(sentences_list):
 	vocab_id_map = {x: i for i, x in enumerate(vocab)}
 	return vocab, vocab_id_map
 
-
-
-
-def embedded_word(word, stop_word, word_vector, word_vector_size):
-	if word in word_vector and word not in stop_word:
-		return word_vector[word]
-	else:
-		return np.zeros((word_vector_size,))
+def embedded_word_by_id(word, vocab_map_id):
+	return vocab_map_id.get(word, 0)
 
 def test_sentence_info(test_sentences):
 	max_length = 0
