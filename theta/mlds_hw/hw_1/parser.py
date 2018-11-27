@@ -49,8 +49,23 @@ def build_vocab(sentences_list):
 	word_counter = Counter(words)
 	vocab = word_counter.keys()
 	vocab = ['<UNK>'] + vocab
+	if '-' in vocab:
+		vocab.remove('-')
+	if '--' in vocab:
+		vocab.remove('--')
+	if '--for' in vocab:
+		vocab.remove('--for')
+	if '--so' in vocab:
+		vocab.remove('--so')
+	if '--the' in vocab:
+		vocab.remove('--the')
 
 	vocab_id_map = {x: i for i, x in enumerate(vocab)}
+	# change <END>
+	end_id = vocab_id_map['<END>']
+	word = list(vocab_id_map.keys())[list(vocab_id_map.values()).index(0)]
+	vocab_id_map['<END>'] = 0
+	vocab_id_map[word] = end_id
 	return vocab, vocab_id_map
 
 def embedded_word_by_id(word, vocab_map_id):
