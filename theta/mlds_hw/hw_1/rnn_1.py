@@ -142,7 +142,7 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 					if current_step != 0 and (current_step % save_every == 0 or (epoch == n_epoch - 1 and i == n_batch-1)):
 						print np.argmax(logits, axis=1)
 						checkpoint_path = os.path.join(save_dir, 'model.ckpt')
-						path = saver.save(sess, checkpoint_path, global_step=epoch)
+						path = saver.save(sess, checkpoint_path, global_step=global_step)
 						print 'save model checkpoint to {}'.format(path)
 
 
