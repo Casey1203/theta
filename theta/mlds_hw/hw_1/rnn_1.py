@@ -102,8 +102,15 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 	backward_id_s_list = backward_id_s_list[:n_batch * batch_size]
 	space_word_id_list = space_word_id_list[:n_batch * batch_size]
 	space_word_one_hot_list = convert_to_one_hot(space_word_id_list, vocab_size)
+	cpu_num = 6
+	config = tf.ConfigProto(
+		device_count={'CPU': cpu_num},
+		inter_op_parallelism_threads=cpu_num,
+		intra_op_parallelism_threads=cpu_num,
+		log_device_placement=True
+	)
 	with tf.Graph().as_default():
-		with tf.Session() as sess:
+		with tf.Session(config=config) as sess:
 			model = RNNModel(n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled)
 			global_step = tf.Variable(initial_value=0, name='global_step', trainable=False)
 			optimizer = tf.train.AdamOptimizer(learning_rate)
