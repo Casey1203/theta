@@ -15,7 +15,7 @@ from parser import clean_sentence, embedded_sentence_by_id, build_vocab, embedde
 import numpy as np
 
 def convert_to_one_hot(y, C):
-	return np.eye(C, dtype=int)[y.reshape(-1)]
+	return np.eye(C, dtype=np.int32)[y.reshape(-1)]
 
 def build_encoder(X, hidden_size, n_layer, keep_prob, batch_size, n_step, name):
 	with tf.variable_scope(name) as scope:
@@ -44,29 +44,27 @@ class RNNModel(object):
 		self.y = tf.placeholder(dtype=tf.int32, shape=[None, vocab_size])
 		self.X_forward = tf.placeholder(dtype=tf.int32, shape=[None, n_step]) # batch_size, time_steps
 		self.X_backward = tf.placeholder(dtype=tf.int32, shape=[None, n_step]) # batch_size, time_steps
-		embedding = tf.Variable(tf.truncated_normal([vocab_size, hidden_size], -0.1, 0.1))
+		embedding = tf.get_variable('embedding', shape=[vocab_size, hidden_size], dtype=tf.float32)
+		# embedding = tf.Variable(np.identity(vocab_size, dtype=np.int32), dtype=tf.float32)
 		with tf.name_scope('embed'):
 			input_forward = tf.nn.embedding_lookup(embedding, self.X_forward)
 			input_forward = tf.nn.dropout(input_forward, self.keep_prob)
 			input_backward = tf.nn.embedding_lookup(embedding, self.X_backward)
 			input_backward = tf.nn.dropout(input_backward, self.keep_prob)
-
+		self.input_forward = input_forward
 		outputs_forward, states_forward = build_encoder(input_forward, hidden_size, n_layer, self.keep_prob, batch_size, n_step, 'lstm1')
 		outputs_backward, states_backward = build_encoder(input_backward, hidden_size, n_layer, self.keep_prob, batch_size, n_step, 'lstm2')
-		# output = tf.concat([outputs_forward[:, -1, :], outputs_backward[:, -1, :]], axis=1)
-		output = tf.concat([tf.reduce_sum(outputs_forward, axis=1), tf.reduce_sum(outputs_backward, axis=1)], axis=1)
+		output = tf.concat([outputs_forward[:, -1, :], outputs_backward[:, -1, :]], axis=1)
+		# output = tf.concat([tf.reduce_sum(outputs_forward, axis=1), tf.reduce_sum(outputs_backward, axis=1)], axis=1)
 		# output = tf.concat([outputs_forward[-1], outputs_backward[-1]], axis=1)
 
-		proj_w = tf.get_variable('proj_w', shape=[vocab_size, 2 * hidden_size])
-		proj_b = tf.get_variable('proj_b', shape=[vocab_size])
 		# with tf.name_scope('nce_loss'):
 		# 	# labels = tf.reshape(self.y, [-1, 1])
 		# 	# NCE loss
 		# 	loss = tf.nn.nce_loss(proj_w, proj_b, self.y, output, num_sampled, vocab_size)
 		# 	self.nce_cost = tf.reduce_sum(loss) / batch_size
-		fc_w = tf.Variable(tf.truncated_normal([2 * hidden_size, vocab_size], -0.1, 0.1), dtype=tf.float32)
-		fc_b = tf.Variable(tf.zeros([vocab_size]), dtype=tf.float32)
-		softmax_w = tf.transpose(proj_w)
+		fc_w = tf.Variable(tf.truncated_normal([2 * hidden_size, vocab_size], -0.1, 0.1), dtype=tf.float32, name='fc_w')
+		fc_b = tf.Variable(tf.random_normal([vocab_size]), dtype=tf.float32, name='fc_b')
 		self.logits = tf.matmul(output, fc_w) + fc_b
 		self.probs = tf.nn.softmax(self.logits)
 		with tf.name_scope('loss'):
@@ -78,6 +76,7 @@ class RNNModel(object):
 			correct_prediction = tf.equal(tf.argmax(self.probs, 1), tf.argmax(self.y, 1))
 			self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 		self.fc_w = fc_w
+		self.fc_b = fc_b
 		self.output = output
 		self.outputs_forward = outputs_forward
 		self.outputs_backward = outputs_backward
@@ -96,6 +95,7 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 	n_epoch = config['n_epoch']
 	keep_prob = config['keep_prob']
 	save_every = config['save_every']
+	display_every = config['display_every']
 	save_dir = config['save_dir']
 	n_batch = len(forward_id_s_list) / batch_size
 	forward_id_s_list = forward_id_s_list[:n_batch * batch_size]
@@ -110,6 +110,7 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 			tvars = tf.trainable_variables()
 			grads, _ = tf.clip_by_global_norm(tf.gradients(model.loss, tvars), clip_norm=grad_clip)
 			train_op = optimizer.apply_gradients(zip(grads, tvars), global_step=global_step)
+			# train_op = optimizer.minimize(model.loss, global_step=global_step)
 
 			# grad_summaries = []
 			saver = tf.train.Saver(tf.global_variables())
@@ -118,13 +119,13 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 
 			for epoch in xrange(n_epoch):
 				# state = sess.run(model.init_state)
-				for i in xrange(1, n_batch):
+				for i in xrange(0, n_batch):
 					start = time.time()
-					data_forward_batch = forward_id_s_list[(i-1) * batch_size: i * batch_size]
-					data_backward_batch = backward_id_s_list[(i-1) * batch_size: i * batch_size]
-					data_y_batch = space_word_one_hot_list[(i-1) * batch_size: i * batch_size]
+					data_forward_batch = forward_id_s_list[(i) * batch_size: (i+1) * batch_size]
+					data_backward_batch = backward_id_s_list[(i) * batch_size: (i+1) * batch_size]
+					data_y_batch = space_word_one_hot_list[(i) * batch_size: (i+1) * batch_size]
 					feed_dict = {model.X_forward: data_forward_batch, model.X_backward: data_backward_batch, model.y: data_y_batch, model.keep_prob: keep_prob}
-					_, step, loss, accuracy, logits, y, fc_w, output, outputs_backward = sess.run([train_op, global_step, model.loss, model.accuracy, model.logits, model.y, model.fc_w, model.output, model.outputs_backward], feed_dict=feed_dict)
+					_, step, loss, accuracy, logits, y, fc_w, output, outputs_backward, fc_b, input_forward, prob = sess.run([train_op, global_step, model.loss, model.accuracy, model.logits, model.y, model.fc_w, model.output, model.outputs_backward, model.fc_b, model.input_forward, model.probs], feed_dict=feed_dict)
 					print "training step {}, epoch {}, batch {}/{}, loss: {:.4f}, accuracy: {:.4f}, time/batch: {:.3f}".\
 						format(step, epoch, i, n_batch, loss, accuracy, time.time()-start)
 					# print 'logits', logits
@@ -136,9 +137,12 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 					# print 'outputs_backward'
 					# print outputs_backward
 					current_step = tf.train.global_step(sess, global_step)
+					if current_step != 0 and current_step % display_every == 0:
+						print np.argmax(logits, axis=1)
 					if current_step != 0 and (current_step % save_every == 0 or (epoch == n_epoch - 1 and i == n_batch-1)):
+						print np.argmax(logits, axis=1)
 						checkpoint_path = os.path.join(save_dir, 'model.ckpt')
-						path = saver.save(sess, checkpoint_path, global_step=current_step)
+						path = saver.save(sess, checkpoint_path, global_step=epoch)
 						print 'save model checkpoint to {}'.format(path)
 
 
@@ -146,13 +150,12 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 def main():
 	stop_word = open('../../data/stopwords.txt', 'r').read().split('\n')
 	# word_vector = KeyedVectors.load_word2vec_format('../../model/word_vector.bin', binary=True)
-	n_step = 10
-	hidden_size = 400
-	n_layer = 2
-	batch_size = 50
-	learning_rate = 0.02
+	n_step = 20
+	n_layer = 1
+	batch_size = 200
+	learning_rate = 0.1
 	grad_clip = 0.25
-	n_epoch = 2
+	n_epoch = 200
 	data_path = '../../data/Holmes_Training_Data'
 	forward_embedding_data_path = os.path.join(data_path, 'forward_id_s_list.npy')
 	backward_embedding_data_path = os.path.join(data_path, 'backward_id_s_list.npy')
@@ -221,13 +224,16 @@ def main():
 		pickle.dump({'vocab': vocab, 'vocab_id_map': vocab_id_map}, open(vocab_path, 'wb'))
 
 	num_sampled = int(0.7 * len(vocab))
+	hidden_size = 400
 	print 'num_sampled:', num_sampled
 	config = {
 		'n_step': n_step, 'hidden_size': hidden_size, 'n_layer': n_layer, 'batch_size': batch_size,
 		'vocab_size': len(vocab), 'num_sampled': num_sampled, 'learning_rate': learning_rate, 'grad_clip': grad_clip,
-		'n_epoch': n_epoch, 'keep_prob': 1, 'save_every': 100, 'save_dir': 'model/'
+		'n_epoch': n_epoch, 'keep_prob': 1, 'display_every': 100, 'save_every': 500, 'save_dir': 'model/'
 	}
-
+	# forward_id_s_list = np.array([forward_id_s_list[0]])
+	# backward_id_s_list = np.array([backward_id_s_list[0]])
+	# space_word_id_list = np.array([space_word_id_list[0]])
 	train(forward_id_s_list, backward_id_s_list, space_word_id_list, config)
 
 if __name__ == '__main__':

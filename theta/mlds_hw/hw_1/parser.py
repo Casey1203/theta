@@ -42,6 +42,13 @@ def embedded_sentence_by_id(sentence, vocab_map_id, seq_length):
 		id_s[i] = vocab_map_id.get(word, 0)
 	return id_s
 
+def map_sentence_by_id(sentence, vocab_map_id):
+	word_list = sentence.split()
+	id_s = np.ones(len(word_list), np.int32) * vocab_map_id['<END>']
+	for i, word in enumerate(word_list):
+		id_s[i] = vocab_map_id.get(word, 0)
+	return id_s
+
 def build_vocab(sentences_list):
 	words = []
 	for sentence in sentences_list:
@@ -61,11 +68,11 @@ def build_vocab(sentences_list):
 		vocab.remove('--the')
 
 	vocab_id_map = {x: i for i, x in enumerate(vocab)}
-	# change <END>
-	end_id = vocab_id_map['<END>']
-	word = list(vocab_id_map.keys())[list(vocab_id_map.values()).index(0)]
-	vocab_id_map['<END>'] = 0
-	vocab_id_map[word] = end_id
+	# # change <END>
+	# end_id = vocab_id_map['<END>']
+	# word = list(vocab_id_map.keys())[list(vocab_id_map.values()).index(0)]
+	# vocab_id_map['<END>'] = 0
+	# vocab_id_map[word] = end_id
 	return vocab, vocab_id_map
 
 def embedded_word_by_id(word, vocab_map_id):
