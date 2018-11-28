@@ -121,6 +121,7 @@ def train(forward_id_s_list, backward_id_s_list, space_word_id_list, config):
 
 			# grad_summaries = []
 			saver = tf.train.Saver(tf.global_variables())
+			saver.restore(sess, tf.train.latest_checkpoint(save_dir))
 			# init all variable
 			sess.run(tf.global_variables_initializer())
 
