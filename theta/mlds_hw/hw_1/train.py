@@ -7,6 +7,7 @@ import time, os, pickle
 import numpy as np
 from reader import load_holmes_raw_data
 from parser import clean_sentence, build_vocab, embedded_sentence_by_id
+from gensim.models import KeyedVectors
 
 def train(data, config):
 	n_step = config['n_step']
@@ -63,6 +64,8 @@ def train(data, config):
 						path = saver.save(sess, checkpoint_path, global_step=current_step)
 						print 'save model checkpoint to {}'.format(path)
 
+def init_word_embedding(word_vector, vocab):
+	pass
 
 def main():
 	stop_word = open('../../data/stopwords.txt', 'r').read().split('\n')
@@ -113,10 +116,12 @@ def main():
 		pickle.dump({'vocab': vocab, 'vocab_id_map': vocab_id_map}, open(vocab_path, 'wb'))
 	num_sampled = int(0.5 * len(vocab))
 	print 'num_sampled:', num_sampled
+	word_vector = KeyedVectors.load_word2vec_format('model/word_vector.bin', binary=True)
 	config = {
 		'n_step': n_step, 'hidden_size': hidden_size, 'n_layer': n_layer, 'batch_size': batch_size,
 		'vocab_size': len(vocab), 'num_sampled': num_sampled, 'learning_rate': learning_rate, 'grad_clip': grad_clip,
-		'n_epoch': n_epoch, 'keep_prob': 0.9, 'save_every': 1000, 'save_dir': 'model/'
+		'n_epoch': n_epoch, 'keep_prob': 0.9, 'save_every': 1000, 'save_dir': 'model/',
+		'word_embedding': word_embedding
 	}
 
 	train(id_s_list, config)
