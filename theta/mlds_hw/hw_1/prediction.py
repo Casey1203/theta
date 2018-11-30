@@ -2,23 +2,25 @@
 # @Time    : 18-11-21 下午6:17
 # @Author  : jia
 
-from reader import load_testing_data_with_multiple_option, load_test_answer
+from reader import load_testing_data_with_multiple_option, load_test_answer, load_mlds_hw3_test_data
 from rnn_2 import RNNModel
 import pickle, os
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 from parser import clean_sentence, embedded_sentence_by_id, test_sentence_info
 
 def main():
 	n_step = 40
-	path = '../../data/testing_data.csv'
+	path = '../../data/MLSD-HW3_test_data.txt'
 	stop_word = open('../../data/stopwords.txt', 'r').read().split('\n')
 	data_path = '../../data/Holmes_Training_Data'
 	vocab_path = os.path.join(data_path, 'vocab.pkl')
 	vocab_dict = pickle.load(open(vocab_path, 'rb'))
 	vocab, vocab_id_map = vocab_dict['vocab'], vocab_dict['vocab_id_map']
 	vocab_size = len(vocab)
-	test_sentences = load_testing_data_with_multiple_option(path)
+	test_sentences = load_mlds_hw3_test_data(path)
+	# test_sentences = load_testing_data_with_multiple_option(path)
 	# remove stop word
 	# add start and end mark, map to id
 	for i, test_sentence in enumerate(test_sentences):
@@ -28,7 +30,7 @@ def main():
 			clean_sent = '<START> ' + clean_sent + ' <END>'
 			test_sentences[i][j] = embedded_sentence_by_id(clean_sent, vocab_id_map, n_step)
 
-	hidden_size = 400
+	hidden_size = 500
 	n_layer = 1
 	batch_size = 5
 	num_sampled = 2000
@@ -41,6 +43,7 @@ def main():
 		saver.restore(sess, latest_checkpoint)
 
 		prediction = []
+		prediction_ser = pd.Series(index=range(len(test_sentences)))
 		option_list = ['a', 'b', 'c', 'd', 'e']
 		for i, test_sentence in enumerate(test_sentences):
 			if i > 0 and i % 10 == 0:
@@ -52,11 +55,16 @@ def main():
 			seq_loss_individual = seq_loss_individual.sum(axis=1)
 			idx = np.argmin(seq_loss_individual)
 			prediction.append(option_list[idx])
+			prediction_ser[i] = option_list[idx]
 		prediction = np.array(prediction)
+		prediction_ser.name = 'Answer'
 
 	answer_list = load_test_answer(os.path.join('../../data', 'test_answer.csv'))
 	answer_list = np.array(answer_list)
 	pickle.dump({'prediction': prediction, 'answer': answer_list}, open('prediction.pkl', 'wb'))
+	prediction_df = pd.DataFrame(prediction_ser)
+	prediction_df['Id'] = range(1, len(test_sentences))
+	prediction_df[['Id', 'Answer']].to_csv('prediction_ser.csv')
 	print prediction
 	print answer_list
 

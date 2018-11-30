@@ -25,15 +25,15 @@ def train(data, config):
 	data = data[:n_batch * batch_size]
 	data_x = data[:, :-1]
 	data_y = data[:, 1:]
-	cpu_num = 6
-	sess_config = tf.ConfigProto(
-		device_count={'CPU': cpu_num},
-		inter_op_parallelism_threads=cpu_num,
-		intra_op_parallelism_threads=cpu_num,
-		log_device_placement=True
-	)
+	# cpu_num = 6
+	# sess_config = tf.ConfigProto(
+	# 	device_count={'CPU': cpu_num},
+	# 	inter_op_parallelism_threads=cpu_num,
+	# 	intra_op_parallelism_threads=cpu_num,
+	# 	log_device_placement=True
+	# )
 	with tf.Graph().as_default():
-		with tf.Session(config=sess_config) as sess:
+		with tf.Session() as sess:
 			model = RNNModel(n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled)
 			global_step = tf.Variable(initial_value=0, name='global_step', trainable=False)
 			optimizer = tf.train.AdamOptimizer(learning_rate)
@@ -68,12 +68,12 @@ def main():
 	stop_word = open('../../data/stopwords.txt', 'r').read().split('\n')
 	# word_vector = KeyedVectors.load_word2vec_format('../../model/word_vector.bin', binary=True)
 	n_step = 38
-	hidden_size = 500
+	hidden_size = 300
 	n_layer = 1
-	batch_size = 200
+	batch_size = 32
 	learning_rate = 0.02
 	grad_clip = 2.5
-	n_epoch = 100
+	n_epoch = 20
 	data_path = '../../data/Holmes_Training_Data'
 	embedding_data_path = os.path.join(data_path, 'id_s_list.npy')
 	vocab_path = os.path.join(data_path, 'vocab.pkl')
@@ -111,12 +111,12 @@ def main():
 		print 'save embedding data and vocab..'
 		np.save(os.path.join(data_path, 'id_s_list.npy'), id_s_list)
 		pickle.dump({'vocab': vocab, 'vocab_id_map': vocab_id_map}, open(vocab_path, 'wb'))
-	num_sampled = int(0.7 * len(vocab))
+	num_sampled = int(0.5 * len(vocab))
 	print 'num_sampled:', num_sampled
 	config = {
 		'n_step': n_step, 'hidden_size': hidden_size, 'n_layer': n_layer, 'batch_size': batch_size,
 		'vocab_size': len(vocab), 'num_sampled': num_sampled, 'learning_rate': learning_rate, 'grad_clip': grad_clip,
-		'n_epoch': n_epoch, 'keep_prob': 1, 'save_every': 500, 'save_dir': 'model/'
+		'n_epoch': n_epoch, 'keep_prob': 0.9, 'save_every': 1000, 'save_dir': 'model/'
 	}
 
 	train(id_s_list, config)

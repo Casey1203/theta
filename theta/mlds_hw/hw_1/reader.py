@@ -4,6 +4,7 @@
 import codecs
 import re
 import pandas as pd
+import re
 
 OPTION_LIST = ['a)', 'b)', 'c)', 'd)', 'e)']
 
@@ -45,6 +46,25 @@ def load_testing_data_with_multiple_option(path):
 			test_sentence_list.append(testing_data[i]['question'].replace('_____', testing_data[i][option]))
 		test_sentences.append(test_sentence_list)
 	return test_sentences
+
+def load_mlds_hw3_test_data(path):
+	counter = 0
+	with open(path, 'rb') as f:
+		test_sentences = []
+		question_list = []
+		for line in f.readlines():
+			word_list = line.split()
+			# option = word_list[0]
+			sent = ' '.join([refine(word) for word in word_list[1:]]).lower()
+			question_list.append(sent)
+			counter += 1
+			if counter == 5:
+				counter = 0
+				test_sentences.append(question_list)
+				question_list = []
+	return test_sentences
+
+
 
 def load_testing_data_and_split(path):
 	testing_data_df = pd.read_csv(path, encoding='utf-8')
