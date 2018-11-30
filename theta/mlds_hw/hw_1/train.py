@@ -116,7 +116,7 @@ def main():
 	config = {
 		'n_step': n_step, 'hidden_size': hidden_size, 'n_layer': n_layer, 'batch_size': batch_size,
 		'vocab_size': len(vocab), 'num_sampled': num_sampled, 'learning_rate': learning_rate, 'grad_clip': grad_clip,
-		'n_epoch': n_epoch, 'keep_prob': 1, 'save_every': 50, 'save_dir': 'model/'
+		'n_epoch': n_epoch, 'keep_prob': 1, 'save_every': 500, 'save_dir': 'model/'
 	}
 
 	train(id_s_list, config)
