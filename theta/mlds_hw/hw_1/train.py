@@ -25,8 +25,15 @@ def train(data, config):
 	data = data[:n_batch * batch_size]
 	data_x = data[:, :-1]
 	data_y = data[:, 1:]
+	cpu_num = 6
+	sess_config = tf.ConfigProto(
+		device_count={'CPU': cpu_num},
+		inter_op_parallelism_threads=cpu_num,
+		intra_op_parallelism_threads=cpu_num,
+		log_device_placement=True
+	)
 	with tf.Graph().as_default():
-		with tf.Session() as sess:
+		with tf.Session(config=sess_config) as sess:
 			model = RNNModel(n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled)
 			global_step = tf.Variable(initial_value=0, name='global_step', trainable=False)
 			optimizer = tf.train.AdamOptimizer(learning_rate)
@@ -60,7 +67,7 @@ def train(data, config):
 def main():
 	stop_word = open('../../data/stopwords.txt', 'r').read().split('\n')
 	# word_vector = KeyedVectors.load_word2vec_format('../../model/word_vector.bin', binary=True)
-	n_step = 40
+	n_step = 38
 	hidden_size = 500
 	n_layer = 1
 	batch_size = 200

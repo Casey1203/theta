@@ -22,7 +22,7 @@ class RNNModel(object):
 
 		with tf.name_scope('embed'):
 			# embedding = tf.get_variable('embedding', shape=[vocab_size, hidden_size], dtype=tf.float32)
-			embedding = tf.Variable(tf.truncated_normal([vocab_size, hidden_size], -0.1, 0.1))
+			embedding = tf.get_variable('embedding', shape=[vocab_size, hidden_size], dtype=tf.float32)
 			inputs = tf.nn.embedding_lookup(embedding, self.x)
 			inputs = tf.nn.dropout(inputs, self.keep_prob)
 
@@ -37,7 +37,7 @@ class RNNModel(object):
 			# 	(output, state) = self.cell(inputs[:, time_step, :], state)
 			# 	outputs.append(output)
 		self.final_state = state
-
+		# output = outputs[:, -1, :]
 		output = tf.reshape(tf.concat(axis=1, values=outputs), [-1, hidden_size])
 
 		with tf.name_scope('nce_loss'):
