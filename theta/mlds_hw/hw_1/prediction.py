@@ -2,7 +2,7 @@
 # @Time    : 18-11-21 下午6:17
 # @Author  : jia
 
-from reader import load_testing_data, load_test_answer
+from reader import load_testing_data_with_multiple_option, load_test_answer
 from rnn_2 import RNNModel
 import pickle, os
 import tensorflow as tf
@@ -18,7 +18,7 @@ def main():
 	vocab_dict = pickle.load(open(vocab_path, 'rb'))
 	vocab, vocab_id_map = vocab_dict['vocab'], vocab_dict['vocab_id_map']
 	vocab_size = len(vocab)
-	test_sentences = load_testing_data(path)
+	test_sentences = load_testing_data_with_multiple_option(path)
 	# remove stop word
 	# add start and end mark, map to id
 	for i, test_sentence in enumerate(test_sentences):

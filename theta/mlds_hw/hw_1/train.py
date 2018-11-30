@@ -36,6 +36,7 @@ def train(data, config):
 
 			# grad_summaries = []
 			saver = tf.train.Saver(tf.global_variables())
+
 			# init all variable
 			sess.run(tf.global_variables_initializer())
 
@@ -60,12 +61,12 @@ def main():
 	stop_word = open('../../data/stopwords.txt', 'r').read().split('\n')
 	# word_vector = KeyedVectors.load_word2vec_format('../../model/word_vector.bin', binary=True)
 	n_step = 40
-	hidden_size = 400
+	hidden_size = 500
 	n_layer = 1
-	batch_size = 50
+	batch_size = 200
 	learning_rate = 0.02
 	grad_clip = 2.5
-	n_epoch = 2
+	n_epoch = 100
 	data_path = '../../data/Holmes_Training_Data'
 	embedding_data_path = os.path.join(data_path, 'id_s_list.npy')
 	vocab_path = os.path.join(data_path, 'vocab.pkl')

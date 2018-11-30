@@ -33,7 +33,7 @@ def load_holmes_raw_data(path):
 		word = refine(file_string)
 	return sentence_list, word
 
-def load_testing_data(path):
+def load_testing_data_with_multiple_option(path):
 	testing_data_df = pd.read_csv(path, encoding='utf-8')
 	testing_data = testing_data_df.to_dict(orient='records')
 	OPTION_LIST = ['a)', 'b)', 'c)', 'd)', 'e)']
@@ -46,7 +46,23 @@ def load_testing_data(path):
 		test_sentences.append(test_sentence_list)
 	return test_sentences
 
-
+def load_testing_data_and_split(path):
+	testing_data_df = pd.read_csv(path, encoding='utf-8')
+	testing_data = testing_data_df.to_dict(orient='records')
+	OPTION_LIST = ['a)', 'b)', 'c)', 'd)', 'e)']
+	test_sentences_forward = []
+	test_sentences_backward = []
+	option_dict_list = []
+	for i in xrange(len(testing_data)):
+		word_list = [refine(word) if word != '_____' else '_____' for word in testing_data[i]['question'].lower().split()]
+		space_index = word_list.index('_____')
+		test_sentences_forward.append(' '.join(word_list[:space_index]))
+		test_sentences_backward.append(' '.join(word_list[space_index+1:]))
+		option_dict = {}
+		for option in OPTION_LIST:
+			option_dict[option.replace(')', '')] = testing_data[i][option]
+		option_dict_list.append(option_dict)
+	return test_sentences_forward, test_sentences_backward, option_dict_list
 
 def load_test_answer(path):
 	test_answer_df = pd.read_csv(path, encoding='utf-8')

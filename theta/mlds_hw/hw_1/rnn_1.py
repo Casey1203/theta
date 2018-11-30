@@ -39,7 +39,7 @@ def build_encoder(X, hidden_size, n_layer, keep_prob, batch_size, n_step, name):
 	return outputs, states
 
 class RNNModel(object):
-	def __init__(self, n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled):
+	def __init__(self, n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled, is_train=True):
 		self.keep_prob = tf.placeholder(tf.float32)
 		self.y = tf.placeholder(dtype=tf.int32, shape=[None, vocab_size])
 		self.X_forward = tf.placeholder(dtype=tf.int32, shape=[None, n_step]) # batch_size, time_steps
@@ -67,14 +67,15 @@ class RNNModel(object):
 		fc_b = tf.Variable(tf.random_normal([vocab_size]), dtype=tf.float32, name='fc_b')
 		self.logits = tf.matmul(output, fc_w) + fc_b
 		self.probs = tf.nn.softmax(self.logits)
-		with tf.name_scope('loss'):
-			cost = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.y)
-			self.loss = tf.reduce_mean(cost)
-		with tf.name_scope('accuracy'):
-			# output_words = tf.argmax(self.probs, axis=1, output_type=tf.int32)
-			# output_words = tf.cast(output_words, tf.int32)
-			correct_prediction = tf.equal(tf.argmax(self.probs, 1), tf.argmax(self.y, 1))
-			self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+		if is_train:
+			with tf.name_scope('loss'):
+				cost = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.y)
+				self.loss = tf.reduce_mean(cost)
+			with tf.name_scope('accuracy'):
+				# output_words = tf.argmax(self.probs, axis=1, output_type=tf.int32)
+				# output_words = tf.cast(output_words, tf.int32)
+				correct_prediction = tf.equal(tf.argmax(self.probs, 1), tf.argmax(self.y, 1))
+				self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 		self.fc_w = fc_w
 		self.fc_b = fc_b
 		self.output = output
