@@ -30,10 +30,11 @@ def main():
 			clean_sent = '<START> ' + clean_sent + ' <END>'
 			test_sentences[i][j] = embedded_sentence_by_id(clean_sent, vocab_id_map, n_step)
 
-	hidden_size = 500
+	hidden_size = 300
 	n_layer = 1
 	batch_size = 5
-	num_sampled = 2000
+	num_sampled = 0.5 * vocab_size
+	print 'num_sampled', num_sampled
 
 	model = RNNModel(n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled)
 	model_path = 'model'
