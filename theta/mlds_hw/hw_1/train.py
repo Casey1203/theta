@@ -22,6 +22,7 @@ def train(data, config):
 	keep_prob = config['keep_prob']
 	save_every = config['save_every']
 	save_dir = config['save_dir']
+	word_embedding = config['word_embedding']
 	n_batch = len(data) / batch_size
 	data = data[:n_batch * batch_size]
 	data_x = data[:, :-1]
@@ -35,7 +36,7 @@ def train(data, config):
 	# )
 	with tf.Graph().as_default():
 		with tf.Session() as sess:
-			model = RNNModel(n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled)
+			model = RNNModel(n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled, word_embedding)
 			global_step = tf.Variable(initial_value=0, name='global_step', trainable=False)
 			optimizer = tf.train.AdamOptimizer(learning_rate)
 			tvars = tf.trainable_variables()
@@ -64,8 +65,15 @@ def train(data, config):
 						path = saver.save(sess, checkpoint_path, global_step=current_step)
 						print 'save model checkpoint to {}'.format(path)
 
-def init_word_embedding(word_vector, vocab):
-	pass
+def init_word_embedding(pretrained_word_vector, vocab, embedding_size):
+	vocab_size = len(vocab)
+	word_embedding = np.zeros((vocab_size, embedding_size), dtype=np.float32)
+	for k, v in enumerate(vocab):
+		if v in pretrained_word_vector:
+			word_embedding[k] = pretrained_word_vector[v]
+		else:
+			word_embedding[k] = np.random.randn(embedding_size)
+	return word_embedding
 
 def main():
 	stop_word = open('../../data/stopwords.txt', 'r').read().split('\n')
@@ -116,7 +124,8 @@ def main():
 		pickle.dump({'vocab': vocab, 'vocab_id_map': vocab_id_map}, open(vocab_path, 'wb'))
 	num_sampled = int(0.5 * len(vocab))
 	print 'num_sampled:', num_sampled
-	word_vector = KeyedVectors.load_word2vec_format('model/word_vector.bin', binary=True)
+	word_vector = KeyedVectors.load_word2vec_format('../../model/word_vector.bin', binary=True)
+	word_embedding = init_word_embedding(word_vector, vocab, hidden_size)
 	config = {
 		'n_step': n_step, 'hidden_size': hidden_size, 'n_layer': n_layer, 'batch_size': batch_size,
 		'vocab_size': len(vocab), 'num_sampled': num_sampled, 'learning_rate': learning_rate, 'grad_clip': grad_clip,
