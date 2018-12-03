@@ -84,7 +84,7 @@ def main():
 	batch_size = 32
 	learning_rate = 0.02
 	grad_clip = 2.5
-	n_epoch = 20
+	n_epoch = 2
 	data_path = '../../data/Holmes_Training_Data'
 	embedding_data_path = os.path.join(data_path, 'id_s_list.npy')
 	vocab_path = os.path.join(data_path, 'vocab.pkl')
@@ -129,7 +129,7 @@ def main():
 	config = {
 		'n_step': n_step, 'hidden_size': hidden_size, 'n_layer': n_layer, 'batch_size': batch_size,
 		'vocab_size': len(vocab), 'num_sampled': num_sampled, 'learning_rate': learning_rate, 'grad_clip': grad_clip,
-		'n_epoch': n_epoch, 'keep_prob': 0.9, 'save_every': 1000, 'save_dir': 'model/',
+		'n_epoch': n_epoch, 'keep_prob': 0.9, 'save_every': 100, 'save_dir': 'model/',
 		'word_embedding': word_embedding
 	}
 

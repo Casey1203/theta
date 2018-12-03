@@ -8,7 +8,7 @@ from gensim.models import KeyedVectors
 
 
 class RNNModel(object):
-	def __init__(self, n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled, word_embedding):
+	def __init__(self, n_step, hidden_size, n_layer, batch_size, vocab_size, num_sampled, word_embedding=None):
 		self.x = tf.placeholder(tf.int32, shape=[None, n_step-1])
 		self.y = tf.placeholder(tf.int32, shape=[None, n_step-1])
 
@@ -23,7 +23,10 @@ class RNNModel(object):
 		with tf.name_scope('embed'):
 			# embedding = tf.get_variable('embedding', shape=[vocab_size, hidden_size], dtype=tf.float32)
 			# embedding = tf.get_variable('embedding', shape=[vocab_size, hidden_size], dtype=tf.float32)
-			embedding = tf.Variable(word_embedding, trainable=True, name='embedding')
+			if word_embedding is not None:
+				embedding = tf.Variable(word_embedding, trainable=True, name='embedding')
+			else:
+				embedding = tf.get_variable('embedding', shape=[vocab_size, hidden_size], dtype=tf.float32)
 			inputs = tf.nn.embedding_lookup(embedding, self.x)
 			inputs = tf.nn.dropout(inputs, self.keep_prob)
 

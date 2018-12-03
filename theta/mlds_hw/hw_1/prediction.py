@@ -40,6 +40,7 @@ def main():
 	model_path = 'model'
 	saver = tf.train.Saver()
 	latest_checkpoint = tf.train.latest_checkpoint(model_path)
+	print 'latest_checkpoint', latest_checkpoint
 	with tf.Session() as sess:
 		saver.restore(sess, latest_checkpoint)
 
@@ -64,8 +65,8 @@ def main():
 	answer_list = np.array(answer_list)
 	pickle.dump({'prediction': prediction, 'answer': answer_list}, open('prediction.pkl', 'wb'))
 	prediction_df = pd.DataFrame(prediction_ser)
-	prediction_df['Id'] = range(1, len(test_sentences))
-	prediction_df[['Id', 'Answer']].to_csv('prediction_ser.csv')
+	prediction_df['Id'] = range(1, len(test_sentences)+1)
+	prediction_df[['Id', 'Answer']].to_csv('prediction_ser.csv', index=None)
 	print prediction
 	print answer_list
 
