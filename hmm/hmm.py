@@ -37,7 +37,7 @@ class HMM:
         for t in reversed(xrange(0, T-1)):
             # beta_dict[t] = self.A[seq[t], :].dot(self.B[seq[t],:]) * beta_dict[t+1]
             for n in xrange(self.num_state):
-                beta[n, t] = np.sum(self.A[n, :] * (self.B[:, t+1]) * beta[: t+1]
+                beta[n, t] = np.sum(self.A[n, :] * (self.B[:, t+1]) * beta[: t+1])
         prob = np.sum(beta[:, 0])
         return beta, prob
 
