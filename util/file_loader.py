@@ -89,3 +89,5 @@ def load_mnist_data(file_name):
 	x_test = x_test.reshape([x_num, x_width * x_height])
 	f.close()
 	return x_train, y_train, x_test, y_test
+
+
