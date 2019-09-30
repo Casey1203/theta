@@ -4,6 +4,7 @@ from tqdm import tqdm
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+from rl.model_free.utils import epsilon_greedy_policy
 
 
 from rl.mdp.util import str_key, set_dict, get_dict
@@ -110,3 +111,42 @@ class Player(Gamer):
 
     def get_state_name(self, dealer):
         str_key(self.get_state(dealer))
+
+
+class MC_Player(Player):
+    def __init__(self):
+        super(MC_Player, self).__init__(name='', A=None, display=False)
+        self.Q = {}
+        self.Nsa = {}
+        self.total_learning_times = 0
+        self.policy = self.epsilon_greedy_policy
+        self.learning_method = self.learn_Q
+
+    def learn_Q(self, episode, r):
+        """
+        更新一次Q value
+        :param episode: 一个状态
+        :param r: G
+        :return:
+        """
+        for s, a in episode:
+            nsa = get_dict(self.Nsa, s, a)
+            nsa += 1
+            set_dict(self.Nsa, s, a)
+            q = get_dict(self.Q, s, a)
+            q = q + 1./nsa * (r - q)
+            set_dict(self.Q, q, s, a)
+        self.total_learning_times += 1
+
+    def epsilon_greedy_policy(self, dealer, epsilon=None):
+        player_points, _ = self.get_points()
+        if player_points >= 21:
+            return 'stop'
+        if player_points < 12:
+            return 'continue'
+        else:
+            A, Q = self.A, self.Q
+            s = self.get_state_name(dealer)
+            if epsilon is None:
+                epsilon = 1.0 / (1+4 * math.log10(1+self.total_learning_times))
+                return epsilon_greedy_policy(A, s, Q, epsilon)
