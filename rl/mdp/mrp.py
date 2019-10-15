@@ -3,6 +3,14 @@ import pandas as pd
 
 
 def compute_return(start_index, chain, gamma, reward_map) -> float:
+    """
+    计算G_t
+    :param start_index: t
+    :param chain: episode
+    :param gamma: discount factor
+    :param reward_map: R
+    :return:
+    """
     retrn = 0.
     power = 0.
     for i in range(start_index, len(chain)):
@@ -13,6 +21,13 @@ def compute_return(start_index, chain, gamma, reward_map) -> float:
     return retrn
 
 def compute_value(P_df, reward_map, gamma):
+    """
+    matrix form bellman equation: (I-gamma * P)^-1 * R
+    :param P_df:
+    :param reward_map:
+    :param gamma:
+    :return:
+    """
     v = np.linalg.inv((np.identity(len(reward_map)) - gamma * P_df)).dot(reward_map.values)
     return v
 

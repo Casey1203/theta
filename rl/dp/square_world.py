@@ -2,6 +2,12 @@ from rl.dp.util import *
 import numpy as np
 
 def dynamics(s, a):
+    """
+    环境动力学，在状态s下，采取action a，得到reward，同时进入状态s'
+    :param s:
+    :param a:
+    :return:
+    """
     if (s % 4 == 0 and a == 'w') or (s < 4 and a == 'n') \
         or (s % 4 == 3 and a == 'e') or (s > 11 and a == 's') or s in [0, 15]:
         # 在墙角或墙壁
@@ -28,12 +34,20 @@ def uniform_random_pi(MDP, V, s, a):
     return 0 if n == 0 else 1.0 / n
 
 def greedy_pi(MDP, V, s, a):
+    """
+    计算行为的概率，该行为使得后续状态的价值最大
+    :param MDP:
+    :param V:
+    :param s:
+    :param a:
+    :return:
+    """
     status_list, action_list, R, P, gamma = MDP
     max_v = -np.inf
     max_v_action = []
     for action in action_list:
         s_prime, reward, _ = dynamics(s, action)
-        v_s_prime = get_value(V, s_prime)
+        v_s_prime = get_value(V, s_prime) # 后续状态的价值
         if v_s_prime > max_v:
             max_v = v_s_prime
             max_v_action = [action]
@@ -141,9 +155,8 @@ if __name__ == '__main__':
     MDP = status_list, action_list, R, P, gamma
 
     # V_pi = policy_iterate(MDP, V, greedy_pi, 100, 100)
-
-    V_star = value_iterate(MDP, V, 4)
-
-    display_V(V_star)
+    # display_V(V_pi)
+    # V_star = value_iterate(MDP, V, 4)
+    # display_V(V_star)
 
     display_policy(greedy_policy, MDP, V_star)

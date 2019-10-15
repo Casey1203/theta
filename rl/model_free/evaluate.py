@@ -11,6 +11,13 @@ from rl.model_free.role import *
 from mpl_toolkits.mplot3d import Axes3D
 
 def policy_evaluate(episoldes, V, Ns):
+    """
+    根据MC sample得到的Ns个episode，通过平均的方法，计算每个状态s的value
+    :param episoldes: 多个episode
+    :param V:
+    :param Ns: number of episode
+    :return:
+    """
     for episode, r in episoldes:
         for s, a in episode:
             ns = get_dict(Ns, s) # 状态的访问次数

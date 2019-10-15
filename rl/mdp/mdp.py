@@ -2,7 +2,15 @@ from rl.mdp.util import *
 import numpy as np
 
 def compute_q(MDP, V, s, a):
-    # q是关于s和a的函数
+    """
+    Q(s, a) = R(s, a) + \sum_s' {P_ss' * gamma * V(s')}
+    q是关于s和a的函数
+    :param MDP: MDP环境动力学
+    :param V: value function
+    :param s: state s
+    :param a: action a
+    :return:
+    """
     status_list, action_list, reward_map, P, gamma = MDP
     q_sa = 0
     for s_prime in status_list:
@@ -12,7 +20,16 @@ def compute_q(MDP, V, s, a):
 
 
 def compute_v(MDP, V, Pi, s):
-    # v是关于s的函数
+    """
+    v(s) = \sum_a {pi(s, a) * Q(s, a)}
+    v是关于s的函数, 给定状态s，求出state value v
+    :param MDP: MDP环境动力学
+    :param V: value function
+    :param Pi: policy, given s and a, output the prob of action a
+    :param s: state s
+    :return:
+    """
+
     status_list, action_list, reward_map, P, gamma = MDP
     v_s = 0
     for a in action_list:
@@ -28,12 +45,27 @@ def update_V(MDP, V, Pi):
     return V_prime
 
 def policy_evaluate(MDP, V, Pi, n):
+    """
+    计算在跟随policy下，每个状态s的value function
+    :param MDP:
+    :param V:
+    :param Pi:
+    :param n:
+    :return:
+    """
     for i in range(n):
         V = update_V(MDP, V, Pi)
     return V
 
 
 def compute_v_from_max_q(MDP, V, s):
+    """
+    v_star(s) = max_a {q(s, a)}
+    :param MDP:
+    :param V:
+    :param s:
+    :return:
+    """
     status_list, action_list, reward_map, P, gamma = MDP
     v_s = -np.float('inf')
     for a in action_list:
@@ -61,11 +93,10 @@ if __name__ == '__main__':
     action_list = ['浏览手机', '学习', '离开浏览', '泡吧', '退出学习']
 
     reward_map = {}
-    P = {} # 状态在take action后转移到另外一个状态的概率
-    Pi = {} # 策略，action在某个statu下的的概率分布
+    P = {} # 状态在take action后转移到另外一个状态的概率, P_ss'
+    Pi = {} # 策略，action在某个status下的的概率分布
 
     gamma = 1.0
-
 
     set_prob(P, status_list[0], action_list[0], status_list[0])
     set_prob(P, status_list[0], action_list[2], status_list[1])
@@ -106,15 +137,15 @@ if __name__ == '__main__':
     MDP = status_list, action_list, reward_map, P, gamma
 
     # V = policy_evaluate(MDP, V, Pi, 100)
-
+    # #
     # display_dict(V)
 
-    v = compute_v(MDP, V, Pi, '第三节课')
-    print('第三节课的最终价值', v)
-
+    # v = compute_v(MDP, V, Pi, '第三节课')
+    # print('第三节课的最终价值', v)
+    #
     V = value_iterate(MDP, V, 4)
     display_dict(V)
-
+    #
     s = '第三节课'
     a = '泡吧'
     q = compute_q(MDP, V, s, a)
